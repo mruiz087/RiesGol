@@ -1,0 +1,411 @@
+-- ============================================================
+-- REISGOL 2.0
+-- MIGRACIÓN MULTIPORRA / MULTITORNEO
+-- VERSIÓN REVISADA
+-- ============================================================
+
+set search_path to porra;
+
+-- ============================================================
+-- TOURNAMENTS
+-- ============================================================
+
+create table if not exists tournaments (
+
+    id bigint generated always as identity primary key,
+
+    external_code text not null unique,
+
+    nombre text not null,
+
+    tipo text not null check (
+        tipo in (
+            'WORLD_CUP',
+            'EURO'
+        )
+    ),
+
+    anio integer not null,
+
+    fecha_inicio timestamptz,
+
+    fecha_fin timestamptz,
+
+    estado text not null default 'draft'
+    check (
+        estado in (
+            'draft',
+            'active',
+            'finished',
+            'archived'
+        )
+    ),
+
+    created_at timestamptz not null default now()
+);
+
+-- ============================================================
+-- GROUPS (PORRAS)
+-- ============================================================
+
+create table if not exists groups (
+
+    id bigint generated always as identity primary key,
+
+    nombre text not null,
+
+    codigo text not null unique,
+
+    tournament_id bigint not null
+        references tournaments(id)
+        on delete cascade,
+
+    created_by uuid not null
+        references users(id),
+
+    special_prize_enabled boolean not null default false,
+
+    special_position integer,
+
+    created_at timestamptz not null default now()
+);
+
+create index if not exists idx_groups_tournament
+on groups(tournament_id);
+
+create index if not exists idx_groups_codigo
+on groups(codigo);
+
+-- ============================================================
+-- GROUP MEMBERS
+-- ============================================================
+
+create table if not exists group_members (
+
+    id bigint generated always as identity primary key,
+
+    group_id bigint not null
+        references groups(id)
+        on delete cascade,
+
+    user_id uuid not null
+        references users(id)
+        on delete cascade,
+
+    role text not null default 'member'
+    check (
+        role in (
+            'admin',
+            'member'
+        )
+    ),
+
+    joined_at timestamptz not null default now(),
+
+    unique(group_id, user_id)
+);
+
+create index if not exists idx_group_members_group
+on group_members(group_id);
+
+create index if not exists idx_group_members_user
+on group_members(user_id);
+
+-- ============================================================
+-- TEAM ALIASES
+-- PARA EVITAR LOS 300+ NOMBRES HARDCODEADOS
+-- ============================================================
+
+create table if not exists team_aliases (
+
+    id bigint generated always as identity primary key,
+
+    api_name text not null unique,
+
+    team_id integer not null
+        references teams(id)
+        on delete cascade
+);
+
+create index if not exists idx_team_aliases_team
+on team_aliases(team_id);
+
+-- ============================================================
+-- USERS
+-- ============================================================
+
+alter table users
+drop column if exists puntaje_total;
+
+alter table users
+drop column if exists elegible_ultimo_puesto;
+
+create unique index if not exists ux_users_name
+on users(lower(name));
+
+-- ============================================================
+-- MATCHES
+-- ============================================================
+
+alter table matches
+add column if not exists tournament_id bigint;
+
+alter table matches
+add column if not exists last_sync_at timestamptz;
+
+do $$
+begin
+
+    if not exists (
+        select 1
+        from information_schema.table_constraints
+        where table_schema = 'porra'
+        and table_name = 'matches'
+        and constraint_name = 'matches_tournament_fk'
+    )
+    then
+
+        alter table matches
+        add constraint matches_tournament_fk
+        foreign key (tournament_id)
+        references tournaments(id);
+
+    end if;
+
+end $$;
+
+create index if not exists idx_matches_tournament
+on matches(tournament_id);
+
+-- ============================================================
+-- BETS
+-- ============================================================
+
+alter table bets
+add column if not exists group_id bigint;
+
+do $$
+begin
+
+    if not exists (
+        select 1
+        from information_schema.table_constraints
+        where table_schema = 'porra'
+        and table_name = 'bets'
+        and constraint_name = 'bets_group_fk'
+    )
+    then
+
+        alter table bets
+        add constraint bets_group_fk
+        foreign key (group_id)
+        references groups(id);
+
+    end if;
+
+end $$;
+
+create index if not exists idx_bets_group
+on bets(group_id);
+
+create index if not exists idx_bets_match
+on bets(match_id);
+
+create index if not exists idx_bets_user
+on bets(user_id);
+
+-- ============================================================
+-- FAVORITE SELECTIONS
+-- (ANTIGUO PICHICHI_TEAMS)
+-- ============================================================
+
+do $$
+begin
+
+    if exists (
+        select 1
+        from information_schema.tables
+        where table_schema = 'porra'
+        and table_name = 'pichichi_teams'
+    )
+    then
+
+        alter table pichichi_teams
+        rename to favorite_selections;
+
+    end if;
+
+exception when others then
+    null;
+
+end $$;
+
+-- ============================================================
+-- RENOMBRAR CAMPO grupo -> bombo
+-- ============================================================
+
+do $$
+begin
+
+    if exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'porra'
+        and table_name = 'favorite_selections'
+        and column_name = 'grupo'
+    )
+    then
+
+        alter table favorite_selections
+        rename column grupo to bombo;
+
+    end if;
+
+exception when others then
+    null;
+
+end $$;
+
+-- ============================================================
+-- FAVORITE SELECTIONS
+-- NUEVAS COLUMNAS
+-- ============================================================
+
+alter table favorite_selections
+add column if not exists group_id bigint;
+
+do $$
+begin
+
+    if not exists (
+        select 1
+        from information_schema.table_constraints
+        where table_schema = 'porra'
+        and table_name = 'favorite_selections'
+        and constraint_name = 'favorite_selections_group_fk'
+    )
+    then
+
+        alter table favorite_selections
+        add constraint favorite_selections_group_fk
+        foreign key (group_id)
+        references groups(id);
+
+    end if;
+
+end $$;
+
+create index if not exists idx_favorites_group
+on favorite_selections(group_id);
+
+create index if not exists idx_favorites_user
+on favorite_selections(user_id);
+
+-- ============================================================
+-- UN FAVORITO POR BOMBO
+-- ============================================================
+
+create unique index if not exists ux_favorites_user_bombo
+on favorite_selections(
+    group_id,
+    user_id,
+    bombo
+);
+
+-- ============================================================
+-- REGLA:
+-- UNA PORRA NUNCA PUEDE QUEDARSE SIN ADMIN
+-- ============================================================
+
+create or replace function validate_last_admin()
+returns trigger
+language plpgsql
+as $$
+declare
+    v_admin_count integer;
+begin
+
+    select count(*)
+    into v_admin_count
+    from group_members
+    where group_id = old.group_id
+    and role = 'admin';
+
+    if v_admin_count <= 1 then
+
+        raise exception
+        'La porra debe mantener al menos un administrador';
+
+    end if;
+
+    return old;
+end;
+$$;
+
+drop trigger if exists prevent_last_admin_delete
+on group_members;
+
+create trigger prevent_last_admin_delete
+before delete
+on group_members
+for each row
+when (
+    old.role = 'admin'
+)
+execute function validate_last_admin();
+
+drop trigger if exists prevent_last_admin_update
+on group_members;
+
+create trigger prevent_last_admin_update
+before update
+on group_members
+for each row
+when (
+    old.role = 'admin'
+    and new.role <> 'admin'
+)
+execute function validate_last_admin();
+
+-- ============================================================
+-- DATOS SEMILLA
+-- ============================================================
+
+insert into tournaments (
+    external_code,
+    nombre,
+    tipo,
+    anio,
+    estado
+)
+values (
+    'WC',
+    'Mundial 2026',
+    'WORLD_CUP',
+    2026,
+    'active'
+)
+on conflict (external_code)
+do nothing;
+
+-- ============================================================
+-- COMENTARIOS
+-- ============================================================
+
+comment on table tournaments is
+'Competiciones oficiales obtenidas desde APIs externas';
+
+comment on table groups is
+'Porras privadas creadas por usuarios';
+
+comment on table group_members is
+'Usuarios participantes en cada porra';
+
+comment on table team_aliases is
+'Mapeo de nombres API -> equipos internos';
+
+comment on table favorite_selections is
+'Equipos favoritos seleccionados por usuarios para la competición Pichichi';
+
+comment on function validate_last_admin is
+'Impide que una porra se quede sin administradores';

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RiesGol - Porra Mundial/Eurocopa</title>
+    
+    <!-- PWA Meta tags -->
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="apple-touch-icon" href="./assets/icon-192.png">
+
+    <!-- Fonts: Inter & Outfit for modern look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="./css/styles.css">
+
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav id="navbar" class="hidden">
+            <div class="nav-brand">⚽ RiesGol</div>
+            <ul class="nav-links">
+                <li><a href="#" data-target="my-groups-view" class="active">Mis Porras</a></li>
+                <li><a href="#" data-target="dashboard-view">Clasificación</a></li>
+                <li><a href="#" data-target="matches-view">Partidos & Apuestas</a></li>
+                <li><a href="#" data-target="pichichi-view">Pichichi</a></li>
+                <li><a href="#" data-target="stats-view">Estadísticas</a></li>
+                <li><a href="#" data-target="group-admin-view" id="admin-link" style="display: none;">Admin</a></li>
+                <li><a href="#" data-target="opciones-view">Opciones</a></li>
+            </ul>
+            <div class="mobile-menu-btn">☰</div>
+        </nav>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="hidden">
+            <div class="spinner"></div>
+        </div>
+
+        <main id="main-content">
+            <!-- Login/Register View -->
+            <section id="login-view" class="view active">
+                <div class="auth-container glass-panel">
+                    <h1 class="logo-text">RiesGol</h1>
+                    <p class="subtitle">La porra definitiva del Mundial</p>
+
+                    <form id="auth-form">
+                        <div class="input-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" required placeholder="tu@email.com">
+                        </div>
+                        <div class="input-group">
+                            <label for="password">Contraseña</label>
+                            <input type="password" id="password" required placeholder="••••••••">
+                        </div>
+                        <div class="input-group hidden" id="name-group">
+                            <label for="name">Nombre / Apodo</label>
+                            <input type="text" id="name" placeholder="Tu nombre en la porra">
+                        </div>
+                        <button type="submit" class="btn-primary" id="auth-submit">Entrar</button>
+                        <p class="auth-switch">¿No tienes cuenta? <a href="#" id="toggle-auth">Regístrate aquí</a></p>
+                    </form>
+                </div>
+            </section>
+
+            <!-- My Groups View (Mis Porras) -->
+            <section id="my-groups-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Mis Porras</h2>
+                    <p class="text-muted">Gestiona tus porras y participa en torneos</p>
+                </header>
+
+                <div class="action-buttons">
+                    <button id="create-group-btn" class="btn-primary">+ Crear Porra</button>
+                    <button id="join-group-btn" class="btn-secondary">Unirse con Código</button>
+                </div>
+
+                <div class="filter-buttons" style="margin: 1rem 0;">
+                    <button class="btn-secondary btn-sm active" data-filter="all">Todas</button>
+                    <button class="btn-secondary btn-sm" data-filter="active">Activas</button>
+                    <button class="btn-secondary btn-sm" data-filter="finished">Finalizadas</button>
+                </div>
+
+                <div id="groups-container" class="groups-grid">
+                    <!-- JS inyectará las porras aquí -->
+                </div>
+            </section>
+
+            <!-- Create Group View (Crear Porra) -->
+            <section id="create-group-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Crear Nueva Porra</h2>
+                    <p class="text-muted">Crea una porra privada para jugar con tus amigos</p>
+                </header>
+
+                <div class="glass-panel" style="max-width: 500px; margin: 0 auto; padding: 2rem;">
+                    <form id="create-group-form">
+                        <div class="input-group">
+                            <label for="group-name">Nombre de la Porra</label>
+                            <input type="text" id="group-name" required placeholder="Ej: Cuadrilla, Oficina, Familia">
+                        </div>
+                        <div class="input-group">
+                            <label for="tournament-select">Torneo</label>
+                            <select id="tournament-select" required>
+                                <option value="">Selecciona un torneo...</option>
+                                <!-- JS inyectará los torneos disponibles -->
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Crear Porra</button>
+                        <button type="button" class="btn-secondary" id="cancel-create-group" style="margin-top: 0.5rem;">Cancelar</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Join Group View (Unirse a Porra) -->
+            <section id="join-group-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Unirse a una Porra</h2>
+                    <p class="text-muted">Introduce el código de la porra para unirte</p>
+                </header>
+
+                <div class="glass-panel" style="max-width: 500px; margin: 0 auto; padding: 2rem;">
+                    <form id="join-group-form">
+                        <div class="input-group">
+                            <label for="join-code">Código de la Porra</label>
+                            <input type="text" id="join-code" required placeholder="Ej: ABC123" maxlength="6" style="text-transform: uppercase;">
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Unirse</button>
+                        <button type="button" class="btn-secondary" id="cancel-join-group" style="margin-top: 0.5rem;">Cancelar</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Dashboard / Ranking View -->
+            <section id="dashboard-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Clasificación General</h2>
+                    <p class="text-muted">Los premios más destacados</p>
+                </header>
+                
+                <!-- Podio -->
+                <div class="podium-container" id="podium-container">
+                    <!-- Posición 2 -->
+                    <div class="podium-step step-2">
+                        <div class="podium-avatar">🥈</div>
+                        <div class="podium-name" id="podium-name-2">--</div>
+                        <div class="podium-pts" id="podium-pts-2">0 pts</div>
+                        <div class="podium-bar silver-bg">2º</div>
+                    </div>
+                    <!-- Posición 1 -->
+                    <div class="podium-step step-1">
+                        <div class="podium-avatar">🥇</div>
+                        <div class="podium-name" id="podium-name-1">--</div>
+                        <div class="podium-pts" id="podium-pts-1">0 pts</div>
+                        <div class="podium-bar gold-bg">1º</div>
+                    </div>
+                    <!-- Posición 13 (Especiales) -->
+                    <div class="podium-step step-13">
+                        <div class="podium-avatar">🎯</div>
+                        <div class="podium-name" id="podium-name-13">13º: --</div>
+                        <div class="podium-pts" id="podium-pts-13">0 pts</div>
+                        <div class="podium-bar special-bg">Especiales</div>
+                    </div>
+                    <!-- Posición Último (más pequeño) -->
+                    <div class="podium-step step-last-mini">
+                        <div class="podium-avatar-mini">💀</div>
+                        <div class="podium-name-mini" id="podium-name-last">--</div>
+                    </div>
+                </div>
+
+                <!-- TABLA 1: Puntos por aciertos 1X2 -->
+                <div class="ranking-container">
+                    <h3 class="ranking-section-title">🏆 Premio por Posición (Aciertos 1X2)</h3>
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>Pos</th>
+                                <th>Jugador</th>
+                                <th>Puntos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ranking-body">
+                            <!-- JS Inyectará filas aquí -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- TABLA 2: Premio Pichichi (goles acumulados) -->
+                <div class="ranking-container" style="margin-top: 2rem;">
+                    <h3 class="ranking-section-title">⚽ Premio Pichichi (Goles de Equipos Elegidos)</h3>
+                    <table class="premium-table">
+                        <thead>
+                            <tr>
+                                <th>Pos</th>
+                                <th>Jugador</th>
+                                <th>Goles</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pichichi-ranking-body">
+                            <!-- JS Inyectará filas aquí -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+
+            <!-- Matches & Betting View -->
+            <section id="matches-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Próximos Partidos</h2>
+                    <p class="multiplicador-info">Fase actual: <strong id="current-phase-name">Grupos</strong> (Multiplicador: <span id="current-multiplier">x1</span>)</p>
+                </header>
+                
+                <div id="matches-container">
+                    <!-- JS Inyectará tarjetas de partidos aquí -->
+                </div>
+            </section>
+
+            <!-- Pichichi View -->
+            <section id="pichichi-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Elección de Pichichi</h2>
+                    <p>Selecciona un equipo de cada bombo favorito. Sumarás todos los goles que marquen durante el torneo.</p>
+                </header>
+                
+                <button id="save-pichichi-btn" class="btn-primary mt-2">Guardar Equipos Pichichi</button>
+                <div class="bombos-grid" id="bombos-container">
+                    <!-- JS Inyectará selectores de bombos aquí -->
+                </div>
+                </header>
+                
+                <div class="stats-container" id="stats-container">
+                    <!-- JS Inyectará estadísticas por partido aquí -->
+                </div>
+            </section>
+
+            <!-- Options View -->
+            <section id="opciones-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Opciones</h2>
+                    <p>Configura tu cuenta y sesión.</p>
+                </header>
+                
+                <div class="glass-panel" style="max-width: 500px; margin: 0 auto; padding: 2rem;">
+                    <h3 style="margin-bottom: 1.5rem;">Cambiar Nombre de Usuario</h3>
+                    <form id="change-name-form">
+                        <div class="input-group">
+                            <label for="new-name">Nuevo Nombre / Apodo</label>
+                            <input type="text" id="new-name" required placeholder="Tu nuevo nombre en la porra">
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Actualizar Nombre</button>
+                    </form>
+
+                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+
+                    <h3 style="margin-bottom: 1rem;">Cerrar Sesión</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">Al cerrar sesión, tendrás que volver a iniciar sesión para acceder a tu cuenta.</p>
+                    <button id="logout-btn" class="btn-secondary" style="width: 100%;">Cerrar Sesión</button>
+                </div>
+            </section>
+
+            <!-- Group Admin View -->
+            <section id="group-admin-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Administración de Porra</h2>
+                    <p>Gestiona miembros y configuración de la porra</p>
+                </header>
+
+                <div class="glass-panel" style="max-width: 800px; margin: 0 auto; padding: 2rem;">
+                    <h3 style="margin-bottom: 1.5rem;">Estado del Torneo</h3>
+                    <form id="tournament-status-form">
+                        <div class="input-group">
+                            <label for="tournament-status">Estado</label>
+                            <select id="tournament-status">
+                                <option value="draft">Borrador</option>
+                                <option value="active">Activo</option>
+                                <option value="finished">Finalizado</option>
+                            </select>
+                            <small style="color: var(--text-muted);">Estado actual del torneo de esta porra</small>
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Actualizar Estado</button>
+                    </form>
+
+                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+
+                    <h3 style="margin-bottom: 1.5rem;">Miembros</h3>
+                    <div id="group-members-container">
+                        <!-- JS inyectará la lista de miembros aquí -->
+                    </div>
+
+                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+
+                    <h3 style="margin-bottom: 1.5rem;">Premio Especial</h3>
+                    <form id="special-prize-form">
+                        <div class="input-group">
+                            <label>
+                                <input type="checkbox" id="special-prize-enabled">
+                                Activar premio especial
+                            </label>
+                        </div>
+                        <div class="input-group" id="special-position-group" style="display: none;">
+                            <label for="special-position">Posición especial</label>
+                            <input type="number" id="special-position" min="1" placeholder="Ej: 13">
+                            <small style="color: var(--text-muted);">La posición que recibirá el premio especial</small>
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar Configuración</button>
+                    </form>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="./js/supabase.js" defer></script>
+    <script src="./js/app.js" defer></script>
+    <script src="./js/auth.js" defer></script>
+    <script src="./js/api.js" defer></script>
+    <script src="./js/groups.js" defer></script>
+    <script src="./js/admin.js" defer></script>
+    <script src="./js/scoring.js" defer></script>
+    <script src="./js/matches.js" defer></script>
+    <script src="./js/pichichi.js" defer></script>
+    <script src="./js/stats.js" defer></script>
+    <script src="./js/opciones.js" defer></script>
+</body>
+</html>
