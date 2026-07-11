@@ -31,7 +31,7 @@ window.loadRanking = async function() {
         const tournamentId = window.Groups?.currentTournamentId;
         const { data: matches } = await window.supabaseClient
             .from('matches')
-            .select('id, equipo_local_id, equipo_visitante_id, goles_local, goles_visitante, fase, estado')
+            .select('id, equipo_local_id, equipo_visitante_id, equipo_local_nombre, equipo_visitante_nombre, goles_local, goles_visitante, fase, estado')
             .eq('tournament_id', tournamentId);
 
         // ─── Obtener apuestas del grupo ──────────────────────────────
@@ -41,20 +41,32 @@ window.loadRanking = async function() {
             .eq('group_id', groupId);
 
         // ─── Obtener selecciones Pichichi del grupo ───────────────────
-        const { data: favoriteSelections } = await window.supabaseClient
+        const { data: favoriteSelections, error: favError } = await window.supabaseClient
             .from('favorite_selections')
-            .select('user_id, equipo_id, bombo, teams(puntos_fifa)')
+            .select('*, teams(id, nombre, puntos_fifa)')
             .eq('group_id', groupId);
+
+        if (favError) console.error('Error cargando selecciones Pichichi:', favError);
 
         // ─── Obtener equipos para puntos FIFA ─────────────────────────
         const { data: teams } = await window.supabaseClient
             .from('teams')
-            .select('id, puntos_fifa');
+            .select('id, nombre, puntos_fifa');
 
-        const teamsMap = {};
-        if (teams) {
-            teams.forEach(t => teamsMap[t.id] = t.puntos_fifa);
-        }
+        const aliases = await window.PichichiScoring.loadTeamAliases();
+        const { teamsFifaMap, teamsNameToId, aliasMap } = window.PichichiScoring.buildTeamMaps(teams, aliases);
+
+        // ─── Obtener configuración de premio especial ─────────────────
+        const { data: groupConfig } = await window.supabaseClient
+            .from('groups')
+            .select('special_prize_enabled, special_position')
+            .eq('id', groupId)
+            .single();
+
+        const specialPrizeEnabled = groupConfig?.special_prize_enabled === true;
+        const specialPosition = specialPrizeEnabled && groupConfig?.special_position > 0
+            ? groupConfig.special_position
+            : null;
 
         // ─── Calcular puntos por usuario ───────────────────────────────
         const userPoints = {};
@@ -63,6 +75,7 @@ window.loadRanking = async function() {
         // Inicializar usuarios
         members.forEach(member => {
             userPoints[member.user_id] = {
+                userId: member.user_id,
                 name: member.users?.name || 'Anónimo',
                 betPoints: 0,
                 pichichiPoints: 0,
@@ -132,37 +145,23 @@ window.loadRanking = async function() {
         }
 
         // ─── Calcular puntos Pichichi ───────────────────────────────────
-        if (matches && favoriteSelections && teams) {
-            // Encontrar el equipo con más puntos FIFA (favorito principal)
-            const maxFifaPoints = Math.max(...Object.values(teamsMap));
+        if (matches && favoriteSelections && teams && window.PichichiScoring) {
+            const fifaValues = Object.values(teamsFifaMap);
+            const maxFifaPoints = fifaValues.length > 0 ? Math.max(...fifaValues) : 1000;
 
+            const selectionsByUser = {};
             favoriteSelections.forEach(selection => {
                 const userId = selection.user_id;
-                const teamId = selection.equipo_id;
-                const teamPoints = teamsMap[teamId] || 1000;
-                
-                // Factor gol = puntos FIFA favorito principal / puntos FIFA equipo seleccionado
-                const goalFactor = maxFifaPoints / teamPoints;
+                if (!selectionsByUser[userId]) selectionsByUser[userId] = [];
+                selectionsByUser[userId].push(selection);
+            });
 
-                // Sumar goles del equipo en todos los partidos
-                let totalGoals = 0;
-                matches.forEach(match => {
-                    if (match.goles_local === null || match.goles_visitante === null) return;
-                    
-                    const multiplier = phaseMultipliers[match.fase] || 1;
-                    let goalsInMatch = 0;
-
-                    if (match.equipo_local_id === teamId) {
-                        goalsInMatch = match.goles_local;
-                    } else if (match.equipo_visitante_id === teamId) {
-                        goalsInMatch = match.goles_visitante;
-                    }
-
-                    totalGoals += goalsInMatch * multiplier * goalFactor;
-                });
-
+            Object.entries(selectionsByUser).forEach(([userId, selections]) => {
+                const { total } = window.PichichiScoring.calcUserPichichi(
+                    selections, matches, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap
+                );
                 if (userPoints[userId]) {
-                    userPoints[userId].pichichiPoints = totalGoals;
+                    userPoints[userId].pichichiPoints = total;
                 }
             });
         }
@@ -183,22 +182,30 @@ window.loadRanking = async function() {
             document.getElementById('podium-name-2').textContent = ranking[1].name;
             document.getElementById('podium-pts-2').textContent = `${ranking[1].totalPoints.toFixed(1)} pts`;
         }
-        
-        // Último elegible (no ha fallado ninguna apuesta)
-        const lastEligible = ranking.filter(u => !u.hasMissedBet).pop();
+
+        const lastPlace = ranking.length > 0 ? ranking[ranking.length - 1] : null;
         const pNameLast = document.getElementById('podium-name-last');
-        if (lastEligible) {
-            pNameLast.textContent = lastEligible.name;
+        if (lastPlace) {
+            pNameLast.textContent = lastPlace.name;
         } else {
             pNameLast.textContent = '--';
         }
 
-        // Posición 13 (si existe)
-        const pName13 = document.getElementById('podium-name-13');
-        if (ranking[12]) {
-            pName13.textContent = `13º: ${ranking[12].name}`;
+        const podiumStepSpecial = document.getElementById('podium-step-special');
+        const pNameSpecial = document.getElementById('podium-name-13');
+        const pPtsSpecial = document.getElementById('podium-pts-13');
+        const pLabelSpecial = document.getElementById('podium-label-special');
+
+        if (specialPosition && ranking[specialPosition - 1]) {
+            const specialUser = ranking[specialPosition - 1];
+            if (podiumStepSpecial) podiumStepSpecial.style.display = '';
+            pNameSpecial.textContent = `${specialPosition}º: ${specialUser.name}`;
+            pPtsSpecial.textContent = `${specialUser.totalPoints.toFixed(1)} pts`;
+            if (pLabelSpecial) pLabelSpecial.textContent = `${specialPosition}º`;
         } else {
-            pName13.textContent = `13º: --`;
+            if (podiumStepSpecial) podiumStepSpecial.style.display = 'none';
+            pNameSpecial.textContent = '--';
+            pPtsSpecial.textContent = '0 pts';
         }
 
         // ─── Renderizar Tabla General ───────────────────────────────────
@@ -209,14 +216,14 @@ window.loadRanking = async function() {
             const pos = index + 1;
             const isFirst = pos === 1;
             const isSecond = pos === 2;
-            const isThirteenth = pos === 13;
-            const isLast = user === lastEligible;
+            const isSpecial = specialPosition && pos === specialPosition;
+            const isLast = pos === ranking.length;
 
             let badgeHtml = '';
             if (isFirst) badgeHtml += '<span class="badge gold ml-2">🥇</span>';
             if (isSecond) badgeHtml += '<span class="badge silver ml-2">🥈</span>';
             if (isLast && ranking.length > 2) badgeHtml += '<span class="badge bronze ml-2">💀</span>';
-            if (isThirteenth) badgeHtml += '<span class="badge spooky ml-2">👻</span>';
+            if (isSpecial) badgeHtml += '<span class="badge spooky ml-2">👻</span>';
 
             const tr = document.createElement('tr');
             const currentUser = window.getCurrentUser();

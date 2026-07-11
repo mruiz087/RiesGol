@@ -115,11 +115,12 @@ function onLoginSuccess() {
     document.getElementById('navbar').classList.remove('hidden');
     window.currentUser = currentUser;
     
-    // Cargar las porras del usuario y redirigir a Mis Porras
     if (window.Groups) {
         window.Groups.loadUserGroups();
     }
-    window.navigateTo('my-groups-view');
+
+    const hasGroup = window.Groups?.currentGroupId != null;
+    window.navigateTo(hasGroup ? 'dashboard-view' : 'my-groups-view');
 }
 
 async function handleLogout(e) {

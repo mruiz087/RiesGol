@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riesgol-v2';
+const CACHE_NAME = 'riesgol-v6';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -7,8 +7,9 @@ const ASSETS_TO_CACHE = [
     './js/supabase.js',
     './js/auth.js',
     './js/api.js',
-    './js/scoring.js',
+    './js/pichichi-scoring.js',
     './js/matches.js',
+    './js/scoring.js',
     './js/pichichi.js',
     './js/stats.js',
     './js/groups.js',

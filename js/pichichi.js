@@ -104,7 +104,7 @@ window.loadPichichiData = async function() {
         container.appendChild(groupsGrid);
 
         Object.keys(grupos).sort().forEach(grupoNombre => {
-            const currentSelection = (userSelections || []).find(s => s.grupo === grupoNombre);
+            const currentSelection = (userSelections || []).find(s => s.bombo === grupoNombre);
             
             const card = document.createElement('div');
             card.className = 'bombo-card glass-panel';
@@ -112,7 +112,7 @@ window.loadPichichiData = async function() {
             if (isLocked) {
                 // --- MODO BLOQUEADO: mostrar selección como texto ---
                 const selectedTeam = currentSelection 
-                    ? teams.find(t => t.id === currentSelection.equipo_id)
+                    ? teams.find(t => t.id === window.PichichiScoring.getSelectionTeamId(currentSelection))
                     : null;
                 const baseGoalValue = selectedTeam 
                     ? (maxFifaPoints / selectedTeam.puntos_fifa).toFixed(2) 
@@ -134,7 +134,7 @@ window.loadPichichiData = async function() {
                 // --- MODO EDICIÓN: mostrar botones seleccionables ---
                 let buttonsHtml = '';
                 grupos[grupoNombre].forEach(team => {
-                    const isSelected = currentSelection && currentSelection.equipo_id === team.id;
+                    const isSelected = currentSelection && window.PichichiScoring.getSelectionTeamId(currentSelection) === team.id;
                     const baseGoalValue = (maxFifaPoints / team.puntos_fifa).toFixed(2);
                     const selectedClass = isSelected ? 'selected' : '';
                     

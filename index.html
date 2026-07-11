@@ -25,13 +25,14 @@
         <nav id="navbar" class="hidden">
             <div class="nav-brand">⚽ RiesGol</div>
             <ul class="nav-links">
-                <li><a href="#" data-target="my-groups-view" class="active">Mis Porras</a></li>
-                <li><a href="#" data-target="dashboard-view">Clasificación</a></li>
-                <li><a href="#" data-target="matches-view">Partidos & Apuestas</a></li>
-                <li><a href="#" data-target="pichichi-view">Pichichi</a></li>
-                <li><a href="#" data-target="stats-view">Estadísticas</a></li>
-                <li><a href="#" data-target="group-admin-view" id="admin-link" style="display: none;">Admin</a></li>
-                <li><a href="#" data-target="opciones-view">Opciones</a></li>
+                <li class="no-group-only"><a href="#" data-target="my-groups-view" id="nav-my-groups">Mis Porras</a></li>
+                <li class="group-only" style="display: none;"><a href="#" id="nav-back-groups" data-leave-group="true">← Volver a Mis Porras</a></li>
+                <li class="group-only" style="display: none;"><a href="#" data-target="dashboard-view">Clasificación</a></li>
+                <li class="group-only" style="display: none;"><a href="#" data-target="matches-view">Partidos & Apuestas</a></li>
+                <li class="group-only" style="display: none;"><a href="#" data-target="pichichi-view">Pichichi</a></li>
+                <li class="group-only" style="display: none;"><a href="#" data-target="stats-view">Estadísticas</a></li>
+                <li class="group-only" style="display: none;"><a href="#" data-target="group-admin-view" id="admin-link">Admin</a></li>
+                <li class="nav-always"><a href="#" data-target="opciones-view">Opciones</a></li>
             </ul>
             <div class="mobile-menu-btn">☰</div>
         </nav>
@@ -77,12 +78,6 @@
                 <div class="action-buttons">
                     <button id="create-group-btn" class="btn-primary">+ Crear Porra</button>
                     <button id="join-group-btn" class="btn-secondary">Unirse con Código</button>
-                </div>
-
-                <div class="filter-buttons" style="margin: 1rem 0;">
-                    <button class="btn-secondary btn-sm active" data-filter="all">Todas</button>
-                    <button class="btn-secondary btn-sm" data-filter="active">Activas</button>
-                    <button class="btn-secondary btn-sm" data-filter="finished">Finalizadas</button>
                 </div>
 
                 <div id="groups-container" class="groups-grid">
@@ -158,12 +153,12 @@
                         <div class="podium-pts" id="podium-pts-1">0 pts</div>
                         <div class="podium-bar gold-bg">1º</div>
                     </div>
-                    <!-- Posición 13 (Especiales) -->
-                    <div class="podium-step step-13">
+                    <!-- Posición especial (configurable por admin) -->
+                    <div class="podium-step step-13" id="podium-step-special">
                         <div class="podium-avatar">🎯</div>
-                        <div class="podium-name" id="podium-name-13">13º: --</div>
+                        <div class="podium-name" id="podium-name-13">--</div>
                         <div class="podium-pts" id="podium-pts-13">0 pts</div>
-                        <div class="podium-bar special-bg">Especiales</div>
+                        <div class="podium-bar special-bg" id="podium-label-special">Especial</div>
                     </div>
                     <!-- Posición Último (más pequeño) -->
                     <div class="podium-step step-last-mini">
@@ -231,6 +226,13 @@
                 <div class="bombos-grid" id="bombos-container">
                     <!-- JS Inyectará selectores de bombos aquí -->
                 </div>
+            </section>
+
+            <!-- Statistics View -->
+            <section id="stats-view" class="view hidden">
+                <header class="view-header">
+                    <h2>Estadísticas</h2>
+                    <p class="text-muted">Distribución de apuestas por partido en la porra</p>
                 </header>
                 
                 <div class="stats-container" id="stats-container">
@@ -322,8 +324,9 @@
     <script src="./js/api.js" defer></script>
     <script src="./js/groups.js" defer></script>
     <script src="./js/admin.js" defer></script>
-    <script src="./js/scoring.js" defer></script>
+    <script src="./js/pichichi-scoring.js" defer></script>
     <script src="./js/matches.js" defer></script>
+    <script src="./js/scoring.js" defer></script>
     <script src="./js/pichichi.js" defer></script>
     <script src="./js/stats.js" defer></script>
     <script src="./js/opciones.js" defer></script>

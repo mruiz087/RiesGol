@@ -19,23 +19,25 @@ function initApp() {
     const navLinks = document.querySelectorAll('.nav-links a');
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
-            // Ignorar el botón de salir
-            if (e.target.id === 'logout-btn') return;
+            if (e.currentTarget.id === 'logout-btn') return;
 
             e.preventDefault();
-            const targetId = e.target.getAttribute('data-target');
+
+            if (e.currentTarget.getAttribute('data-leave-group') === 'true') {
+                if (window.Groups) {
+                    window.Groups.returnToList();
+                }
+                return;
+            }
+
+            const targetId = e.currentTarget.getAttribute('data-target');
             if (targetId) {
                 navigateTo(targetId);
+            }
 
-                // Actualizar clase activa
-                navLinks.forEach(l => l.classList.remove('active'));
-                e.target.classList.add('active');
-
-                // Cerrar menú móvil si está abierto
-                const navUl = document.querySelector('.nav-links');
-                if (navUl.classList.contains('show')) {
-                    navUl.classList.remove('show');
-                }
+            const navUl = document.querySelector('.nav-links');
+            if (navUl.classList.contains('show')) {
+                navUl.classList.remove('show');
             }
         });
     });
@@ -77,11 +79,39 @@ window.navigateTo = function(viewId) {
             window.Admin.loadTournamentStatus();
         }
         
+        if (viewId === 'my-groups-view' && window.Groups) {
+            window.Groups.loadUserGroups();
+        }
+        
+        updateNavVisibility();
+        setActiveNavLink(viewId);
+        
         // Actualizar visibilidad del enlace de admin
         if (window.Admin) {
             window.Admin.updateAdminLinkVisibility();
         }
     }
+}
+
+function setActiveNavLink(viewId) {
+    const navLinks = document.querySelectorAll('.nav-links a[data-target]');
+    navLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('data-target') === viewId);
+    });
+}
+
+// Actualizar visibilidad del menú según estado del grupo
+function updateNavVisibility() {
+    const hasGroup = window.Groups?.currentGroupId != null;
+    const groupOnlyItems = document.querySelectorAll('.group-only');
+    const noGroupOnlyItems = document.querySelectorAll('.no-group-only');
+
+    groupOnlyItems.forEach(item => {
+        item.style.display = hasGroup ? 'block' : 'none';
+    });
+    noGroupOnlyItems.forEach(item => {
+        item.style.display = hasGroup ? 'none' : 'block';
+    });
 }
 
 // Utilidad para mostrar/ocultar el loading overlay

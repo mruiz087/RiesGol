@@ -63,6 +63,8 @@ const TEAM_NAME_TRANSLATIONS = {
     'MICRONESIA': 'Micronesia'
 };
 
+window.TEAM_NAME_TRANSLATIONS = TEAM_NAME_TRANSLATIONS;
+
 function translateTeamName(name) {
     if (!name) return name;
     const key = name.trim().toUpperCase();
@@ -103,16 +105,49 @@ window.loadMatches = async function() {
             return;
         }
 
-        // Obtener apuestas del usuario actual para este grupo
+        // Obtener apuestas del usuario actual y de todo el grupo
         const user = window.getCurrentUser();
         let userBets = [];
-        if (user && window.supabaseClient) {
-            const { data } = await window.supabaseClient
+        let allGroupBets = [];
+        let userPichichiSelections = [];
+        let maxFifaPoints = 1000;
+        let teamsFifaMap = {};
+        let teamsNameToId = {};
+        let aliasMap = {};
+
+        const teams = await window.apiClient.getTeams();
+        if (teams && teams.length > 0) {
+            maxFifaPoints = Math.max(...teams.map(t => t.puntos_fifa));
+        }
+
+        if (user && window.supabaseClient && window.PichichiScoring) {
+            const aliases = await window.PichichiScoring.loadTeamAliases();
+            const maps = window.PichichiScoring.buildTeamMaps(teams || [], aliases);
+            teamsFifaMap = maps.teamsFifaMap;
+            teamsNameToId = maps.teamsNameToId;
+            aliasMap = maps.aliasMap;
+
+            const { data, error: betsError } = await window.supabaseClient
                 .from('bets')
                 .select('*')
                 .eq('user_id', user.id)
                 .eq('group_id', groupId);
+            if (betsError) console.error('Error cargando apuestas:', betsError);
             if (data) userBets = data;
+
+            const { data: groupBets } = await window.supabaseClient
+                .from('bets')
+                .select('user_id, match_id, prediccion')
+                .eq('group_id', groupId);
+            if (groupBets) allGroupBets = groupBets;
+
+            const { data: selections, error: selError } = await window.supabaseClient
+                .from('favorite_selections')
+                .select('*, teams(id, nombre, puntos_fifa)')
+                .eq('user_id', user.id)
+                .eq('group_id', groupId);
+            if (selError) console.error('Error cargando selecciones Pichichi:', selError);
+            if (selections) userPichichiSelections = selections;
         }
 
         // Agrupar partidos por fase, manteniendo el orden de aparición (excluyendo THIRD_PLACE)
@@ -159,7 +194,7 @@ window.loadMatches = async function() {
             const grid = section.querySelector('.phase-matches');
             phaseGroups[fase].forEach(match => {
                 const bet = userBets.find(b => b.match_id === match.id);
-                const card = createMatchCard(match, bet, config.multiplier);
+                const card = createMatchCard(match, bet, config.multiplier, userPichichiSelections, allGroupBets, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
                 grid.appendChild(card);
             });
 
@@ -173,15 +208,89 @@ window.loadMatches = async function() {
     }
 };
 
-function createMatchCard(match, userBet, multiplier) {
+function createMatchCard(match, userBet, multiplier, userPichichiSelections = [], allGroupBets = [], maxFifaPoints = 1000, teamsFifaMap = {}, teamsNameToId = {}, aliasMap = {}) {
+    const PS = window.PichichiScoring;
+    if (!PS) {
+        console.error('PichichiScoring no cargado');
+        return document.createElement('div');
+    }
     const isPast = new Date(match.fecha_inicio) < new Date();
     const isUndefined = match.equipo_local_nombre === 'Por definir' || match.equipo_visitante_nombre === 'Por definir';
     const disableBets = isPast || isUndefined;
-    const card = document.createElement('div');
-    card.className = 'match-card glass-panel';
+
+    const playingSelections = userPichichiSelections.filter(s =>
+        PS.selectionPlaysInMatch(match, s, teamsNameToId, aliasMap)
+    );
+    const hasFavorite = playingSelections.length > 0;
+
+    // Calcular puntos y construir resumen (total visible + desglose en desplegable)
+    let betResult = null;
+    let betPointsEarned = 0;
+    let pichichiPointsEarned = 0;
+    let pichichiBreakdownLines = [];
+    let matchPointsHtml = '';
+
+    if (PS.isMatchFinished(match)) {
+        let resultado = 'X';
+        if (match.goles_local > match.goles_visitante) resultado = '1';
+        else if (match.goles_visitante > match.goles_local) resultado = '2';
+
+        if (userBet) {
+            betResult = userBet.prediccion === resultado;
+            const matchBets = allGroupBets.filter(b => b.match_id === match.id);
+            const failedBets = matchBets.length - matchBets.filter(b => b.prediccion === resultado).length;
+            if (betResult) {
+                betPointsEarned = failedBets * multiplier;
+            }
+        }
+
+        const pichichiResult = PS.calcMatchPichichiForUser(match, userPichichiSelections, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
+        pichichiPointsEarned = pichichiResult.total;
+        pichichiBreakdownLines = pichichiResult.breakdown.map(b =>
+            `${b.teamName}: ${b.goals} gol${b.goals !== 1 ? 'es' : ''} × fase x${b.multiplier} × valor ${b.goalFactor.toFixed(2)}`
+        );
+
+        const totalPoints = betPointsEarned + pichichiPointsEarned;
+
+        let breakdownHtml = '';
+        if (userBet) {
+            breakdownHtml += `<div class="match-points-line">${betResult
+                ? `Apuesta: <strong>+${betPointsEarned} pts</strong> (acierto)`
+                : `Apuesta: <strong>0 pts</strong> (fallo)`}</div>`;
+        } else {
+            breakdownHtml += `<div class="match-points-line">Apuesta: <strong>0 pts</strong> (sin apuesta)</div>`;
+        }
+
+        if (pichichiResult.hasFavorite) {
+            const pichDetail = pichichiBreakdownLines.length > 0
+                ? ` — ${pichichiBreakdownLines.join('; ')}`
+                : '';
+            breakdownHtml += `<div class="match-points-line">Pichichi: <strong>+${pichichiPointsEarned.toFixed(1)} pts</strong>${pichDetail}</div>`;
+        }
+
+        matchPointsHtml = `
+            <details class="match-points-details">
+                <summary class="match-points-summary">
+                    <span class="match-points-total">+${totalPoints.toFixed(1)} pts en este partido</span>
+                    <span class="match-points-chevron">›</span>
+                </summary>
+                <div class="match-points-breakdown">${breakdownHtml}</div>
+            </details>`;
+    }
 
     let selectedPrediction = userBet ? userBet.prediccion : null;
 
+    // Estilos para acierto/fallo
+    const cardBorderStyle = betResult !== null 
+        ? (betResult ? 'border: 2px solid #00ff88;' : 'border: 2px solid #ff4444;') 
+        : '';
+
+    const card = document.createElement('div');
+    card.className = 'match-card glass-panel';
+    if (cardBorderStyle) {
+        card.style = cardBorderStyle;
+    }
+    
     const btn1Class = selectedPrediction === '1' ? 'bet-btn selected' : 'bet-btn';
     const btnXClass = selectedPrediction === 'X' ? 'bet-btn selected' : 'bet-btn';
     const btn2Class = selectedPrediction === '2' ? 'bet-btn selected' : 'bet-btn';
@@ -236,6 +345,16 @@ function createMatchCard(match, userBet, multiplier) {
     const localTeamName = translateTeamName(match.equipo_local_nombre);
     const awayTeamName = translateTeamName(match.equipo_visitante_nombre);
 
+    // Indicador de favorito Pichichi (solo partidos no finalizados)
+    let favoriteIndicator = '';
+    if (hasFavorite && !PS.isMatchFinished(match)) {
+        const favoriteInfo = playingSelections.map(s =>
+            `⚽ ${PS.getSelectionTeamName(s)}`
+        ).join(' · ');
+
+        favoriteIndicator = `<div class="pichichi-indicator">${favoriteInfo} · favorito Pichichi</div>`;
+    }
+
     card.innerHTML = `
         <div class="match-date">${dateStr}</div>
         <div class="match-row">
@@ -248,6 +367,8 @@ function createMatchCard(match, userBet, multiplier) {
             </div>
         </div>
         ${extraInfoHtml}
+        ${favoriteIndicator}
+        ${matchPointsHtml}
         <div class="bet-options">
             <button class="${btn1Class}" data-match="${match.id}" data-pred="1" ${disabledAttr}>1</button>
             <button class="${btnXClass}" data-match="${match.id}" data-pred="X" ${disabledAttr}>X</button>
@@ -348,3 +469,5 @@ async function submitBet(matchId, prediccion) {
         alert("Error al guardar: " + (err.message || "Revisa tu conexión."));
     }
 }
+
+window.translateTeamName = translateTeamName;

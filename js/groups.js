@@ -4,49 +4,39 @@
 const Groups = {
     currentGroupId: null,
     currentTournamentId: null,
-    currentFilter: 'all', // 'all', 'active', 'finished'
+
+    getTournamentStatusLabel: (estado) => {
+        if (estado === 'finished') return { text: 'Finalizada', className: 'finished' };
+        return { text: 'Activa', className: 'active' };
+    },
 
     // Cargar las porras del usuario
-    loadUserGroups: async (filter = 'all') => {
+    loadUserGroups: async () => {
         const user = window.currentUser;
         if (!user) return;
 
-        Groups.currentFilter = filter;
         const groups = await window.apiClient.getUserGroups(user.id);
         const container = document.getElementById('groups-container');
 
-        // Filtrar por estado del torneo
-        let filteredGroups = groups;
-        if (filter === 'active') {
-            filteredGroups = groups.filter(member => 
-                member.groups.tournaments.estado === 'active' || 
-                member.groups.tournaments.estado === 'draft'
-            );
-        } else if (filter === 'finished') {
-            filteredGroups = groups.filter(member => 
-                member.groups.tournaments.estado === 'finished'
-            );
-        }
-        
-        if (!filteredGroups || filteredGroups.length === 0) {
+        if (!groups || groups.length === 0) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <p>No tienes porras con este filtro.</p>
-                    <p>Prueba con otro filtro o crea una porra nueva.</p>
+                    <p>No tienes porras todavía.</p>
+                    <p>Crea una porra nueva o únete con un código.</p>
                 </div>
             `;
             return;
         }
 
-        container.innerHTML = filteredGroups.map(member => {
+        container.innerHTML = groups.map(member => {
             const group = member.groups;
             const tournament = group.tournaments;
             const roleLabel = member.role === 'admin' ? 'Admin' : 'Miembro';
             const roleClass = member.role === 'admin' ? 'admin' : 'member';
-            
+            const status = Groups.getTournamentStatusLabel(tournament.estado);
+
             return `
                 <div class="group-card" data-group-id="${group.id}" data-tournament-id="${tournament.id}">
-                    <div class="group-card-status ${tournament.estado}"></div>
                     <div class="group-card-header">
                         <div>
                             <h3 class="group-card-title">${group.nombre}</h3>
@@ -56,6 +46,7 @@ const Groups = {
                     </div>
                     <span class="group-card-role ${roleClass}">${roleLabel}</span>
                     <p class="group-card-members">Código: ${group.codigo}</p>
+                    <span class="group-card-status ${status.className}">${status.text}</span>
                 </div>
             `;
         }).join('');
@@ -84,11 +75,18 @@ const Groups = {
             window.Admin.updateAdminLinkVisibility();
         }
         
-        // Navegar al dashboard
-        window.app.navigateTo('dashboard-view');
-        
-        // Recargar datos del dashboard con el grupo seleccionado
-        window.app.loadDashboard();
+        // Navegar al dashboard (entrar en la porra)
+        window.navigateTo('dashboard-view');
+    },
+
+    // Volver al listado de porras (salir del contexto de porra activa)
+    returnToList: () => {
+        Groups.currentGroupId = null;
+        Groups.currentTournamentId = null;
+        localStorage.removeItem('currentGroupId');
+        localStorage.removeItem('currentTournamentId');
+
+        window.navigateTo('my-groups-view');
     },
 
     // Cargar torneos disponibles en el select
@@ -107,17 +105,21 @@ const Groups = {
 
     // Crear una nueva porra
     createGroup: async (nombre, tournamentId) => {
+        console.log('createGroup - Iniciando', { nombre, tournamentId });
         const user = window.currentUser;
         if (!user) {
+            console.error('createGroup - No hay usuario');
             alert('Debes iniciar sesión para crear una porra');
             return;
         }
 
+        console.log('createGroup - Llamando a apiClient.createGroup');
         const group = await window.apiClient.createGroup(nombre, tournamentId, user.id);
+        console.log('createGroup - Resultado:', group);
         
         if (group) {
             alert(`Porra "${nombre}" creada con éxito. Código: ${group.codigo}`);
-            window.app.navigateTo('my-groups-view');
+            window.navigateTo('my-groups-view');
             Groups.loadUserGroups();
         } else {
             alert('Error al crear la porra');
@@ -126,17 +128,21 @@ const Groups = {
 
     // Unirse a una porra por código
     joinGroup: async (codigo) => {
+        console.log('joinGroup - Iniciando', { codigo });
         const user = window.currentUser;
         if (!user) {
+            console.error('joinGroup - No hay usuario');
             alert('Debes iniciar sesión para unirte a una porra');
             return;
         }
 
+        console.log('joinGroup - Llamando a apiClient.joinGroupByCode');
         const result = await window.apiClient.joinGroupByCode(codigo.toUpperCase(), user.id);
+        console.log('joinGroup - Resultado:', result);
         
         if (result.success) {
             alert(`Te has unido a la porra "${result.group.nombre}"`);
-            window.app.navigateTo('my-groups-view');
+            window.navigateTo('my-groups-view');
             Groups.loadUserGroups();
         } else {
             alert(result.error || 'Error al unirse a la porra');
@@ -148,12 +154,12 @@ const Groups = {
         // Botón crear porra
         document.getElementById('create-group-btn')?.addEventListener('click', () => {
             Groups.loadTournaments();
-            window.app.navigateTo('create-group-view');
+            window.navigateTo('create-group-view');
         });
 
         // Botón unirse a porra
         document.getElementById('join-group-btn')?.addEventListener('click', () => {
-            window.app.navigateTo('join-group-view');
+            window.navigateTo('join-group-view');
         });
 
         // Formulario crear porra
@@ -173,21 +179,7 @@ const Groups = {
         // Cancelar crear porra
         document.getElementById('cancel-create-group')?.addEventListener('click', () => {
             document.getElementById('create-group-form').reset();
-            window.app.navigateTo('my-groups-view');
-        });
-
-        // Filtros de porras
-        document.querySelectorAll('.filter-buttons button').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const filter = e.target.dataset.filter;
-                
-                // Actualizar clases activas
-                document.querySelectorAll('.filter-buttons button').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                
-                // Recargar porras con el filtro
-                Groups.loadUserGroups(filter);
-            });
+            window.navigateTo('my-groups-view');
         });
 
         // Formulario unirse a porra
@@ -206,7 +198,7 @@ const Groups = {
         // Cancelar unirse a porra
         document.getElementById('cancel-join-group')?.addEventListener('click', () => {
             document.getElementById('join-group-form').reset();
-            window.app.navigateTo('my-groups-view');
+            window.navigateTo('my-groups-view');
         });
 
         // Recuperar grupo seleccionado del localStorage
