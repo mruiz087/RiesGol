@@ -79,7 +79,7 @@ async function handleAuth(e) {
                 const { error: profileError } = await window.supabaseClient
                     .from('users')
                     .insert([
-                        { id: data.user.id, name: name, puntaje_total: 0, elegible_ultimo_puesto: true }
+                        { id: data.user.id, name: name }
                     ]);
                 if (profileError) throw profileError;
             }

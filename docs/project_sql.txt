@@ -134,12 +134,6 @@ on team_aliases(team_id);
 -- USERS
 -- ============================================================
 
-alter table users
-drop column if exists puntaje_total;
-
-alter table users
-drop column if exists elegible_ultimo_puesto;
-
 create unique index if not exists ux_users_name
 on users(lower(name));
 

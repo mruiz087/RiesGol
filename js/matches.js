@@ -430,7 +430,7 @@ async function submitBet(matchId, prediccion) {
             const { error: insertProfileError } = await window.supabaseClient
                 .from('users')
                 .insert([
-                    { id: user.id, name: user.email?.split('@')[0] || 'Usuario', puntaje_total: 0, elegible_ultimo_puesto: true }
+                    { id: user.id, name: user.email?.split('@')[0] || 'Usuario'}
                 ]);
             if (insertProfileError) throw insertProfileError;
         }

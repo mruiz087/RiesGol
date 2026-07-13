@@ -8,8 +8,6 @@ CREATE SCHEMA IF NOT EXISTS porra;
 CREATE TABLE porra.users (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     name TEXT NOT NULL,
-    puntaje_total FLOAT DEFAULT 0,
-    elegible_ultimo_puesto BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -24,9 +22,7 @@ CREATE TABLE porra.teams (
     id SERIAL PRIMARY KEY,
     nombre TEXT NOT NULL,
     puntos_fifa FLOAT NOT NULL,
-    grupo TEXT NOT NULL, -- ej: 'A', 'B', 'C'
-    goles_totales INTEGER DEFAULT 0,
-    logo_url TEXT
+    grupo TEXT NOT NULL -- ej: 'A', 'B', 'C'
 );
 
 -- Habilitar RLS para teams

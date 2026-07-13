@@ -18,28 +18,28 @@
 -- Puedes crear usuarios en Authentication → Users → Add user
 
 -- Usuario 1: Juan Pérez
-INSERT INTO porra.users (id, name, puntaje_total, elegible_ultimo_puesto)
-VALUES ('USER_ID_1', 'Juan Pérez', 0, true)
+INSERT INTO porra.users (id, name)
+VALUES ('USER_ID_1', 'Juan Pérez')
 ON CONFLICT (id) DO NOTHING;
 
 -- Usuario 2: María García
-INSERT INTO porra.users (id, name, puntaje_total, elegible_ultimo_puesto)
-VALUES ('USER_ID_2', 'María García', 0, true)
+INSERT INTO porra.users (id, name)
+VALUES ('USER_ID_2', 'María García')
 ON CONFLICT (id) DO NOTHING;
 
 -- Usuario 3: Carlos López
-INSERT INTO porra.users (id, name, puntaje_total, elegible_ultimo_puesto)
-VALUES ('USER_ID_3', 'Carlos López', 0, true)
+INSERT INTO porra.users (id, name)
+VALUES ('USER_ID_3', 'Carlos López')
 ON CONFLICT (id) DO NOTHING;
 
 -- Usuario 4: Ana Martínez
-INSERT INTO porra.users (id, name, puntaje_total, elegible_ultimo_puesto)
-VALUES ('USER_ID_4', 'Ana Martínez', 0, true)
+INSERT INTO porra.users (id, name)
+VALUES ('USER_ID_4', 'Ana Martínez')
 ON CONFLICT (id) DO NOTHING;
 
 -- Usuario 5: Pedro Sánchez
-INSERT INTO porra.users (id, name, puntaje_total, elegible_ultimo_puesto)
-VALUES ('USER_ID_5', 'Pedro Sánchez', 0, true)
+INSERT INTO porra.users (id, name)
+VALUES ('USER_ID_5', 'Pedro Sánchez')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================

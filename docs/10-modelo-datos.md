@@ -18,12 +18,6 @@ bets
 
 favorite_selections
 
-# Eliminadas
-
-puntaje_total
-
-elegible_ultimo_puesto
-
 # Filosofía
 
 Las clasificaciones se calcularán dinámicamente.
