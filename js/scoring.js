@@ -4,6 +4,9 @@
 window.loadRanking = async function() {
     window.showLoading();
     try {
+        const round2 = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
+        const formatPoints = (n) => round2(n).toFixed(2);
+
         const groupId = window.Groups?.currentGroupId;
         
         if (!window.supabaseClient) return;
@@ -31,7 +34,7 @@ window.loadRanking = async function() {
         const tournamentId = window.Groups?.currentTournamentId;
         const { data: matches } = await window.supabaseClient
             .from('matches')
-            .select('id, equipo_local_id, equipo_visitante_id, equipo_local_nombre, equipo_visitante_nombre, goles_local, goles_visitante, fase, estado')
+            .select('id, fecha_inicio, equipo_local_id, equipo_visitante_id, equipo_local_nombre, equipo_visitante_nombre, goles_local, goles_visitante, fase, estado')
             .eq('tournament_id', tournamentId);
 
         // ─── Obtener apuestas del grupo ──────────────────────────────
@@ -80,7 +83,8 @@ window.loadRanking = async function() {
                 betPoints: 0,
                 pichichiPoints: 0,
                 totalPoints: 0,
-                hasMissedBet: false
+                missedClosedBets: 0,
+                isPaqueteEligible: true
             };
             userPichichiPoints[member.user_id] = 0;
         });
@@ -98,7 +102,9 @@ window.loadRanking = async function() {
 
         // ─── Calcular puntos de apuestas ───────────────────────────────
         if (matches && bets) {
-            matches.forEach(match => {
+            const validMatches = matches.filter(m => (m.fase || 'GROUP_STAGE') !== 'THIRD_PLACE' && (m.fase || 'GROUP_STAGE') !== 'THIRD_PLACE_MATCH');
+
+            validMatches.forEach(match => {
                 if (match.estado !== 'finalizado') return;
                 
                 const multiplier = phaseMultipliers[match.fase] || 1;
@@ -123,24 +129,38 @@ window.loadRanking = async function() {
                     const userId = bet.user_id;
                     if (userPoints[userId]) {
                         if (bet.prediccion === resultado) {
-                            userPoints[userId].betPoints += failedBets * multiplier;
-                        } else {
-                            userPoints[userId].hasMissedBet = true;
+                            userPoints[userId].betPoints = round2(userPoints[userId].betPoints + (failedBets * multiplier));
                         }
                     }
                 });
             });
 
-            // Marcar usuarios sin apuestas en partidos finalizados
-            const finishedMatches = matches.filter(m => m.estado === 'finalizado');
+            // Elegibilidad Premio Paquete (rolling): debe haber apostado en todos los partidos "cerrados"
+            const now = new Date();
+            const closedMatches = validMatches.filter(m => {
+                if (!m.fecha_inicio) return m.estado !== 'pendiente';
+                return new Date(m.fecha_inicio) < now;
+            });
+
+            // Indexar apuestas por usuario para chequear faltas rápido
+            const betMatchIdsByUser = {};
+            bets.forEach(b => {
+                const uid = b.user_id;
+                if (!betMatchIdsByUser[uid]) betMatchIdsByUser[uid] = new Set();
+                betMatchIdsByUser[uid].add(Number(b.match_id));
+            });
+
             members.forEach(member => {
                 const userId = member.user_id;
-                finishedMatches.forEach(match => {
-                    const hasBet = bets.some(b => b.user_id === userId && b.match_id === match.id);
-                    if (!hasBet) {
-                        userPoints[userId].hasMissedBet = true;
-                    }
+                const userSet = betMatchIdsByUser[userId] || new Set();
+                let missed = 0;
+                closedMatches.forEach(match => {
+                    if (!userSet.has(Number(match.id))) missed++;
                 });
+                if (userPoints[userId]) {
+                    userPoints[userId].missedClosedBets = missed;
+                    userPoints[userId].isPaqueteEligible = missed === 0;
+                }
             });
         }
 
@@ -161,32 +181,32 @@ window.loadRanking = async function() {
                     selections, matches, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap
                 );
                 if (userPoints[userId]) {
-                    userPoints[userId].pichichiPoints = total;
+                    userPoints[userId].pichichiPoints = round2(total);
                 }
             });
         }
 
         // ─── Calcular total y ordenar ───────────────────────────────────
         Object.keys(userPoints).forEach(userId => {
-            userPoints[userId].totalPoints = userPoints[userId].betPoints + userPoints[userId].pichichiPoints;
+            userPoints[userId].totalPoints = round2(userPoints[userId].betPoints + userPoints[userId].pichichiPoints);
         });
 
         const ranking = Object.values(userPoints).sort((a, b) => b.totalPoints - a.totalPoints);
+        const paqueteWinner = ranking.filter(u => u.isPaqueteEligible).slice(-1)[0] || null;
 
         // ─── Renderizar Podio ───────────────────────────────────────────
         if (ranking[0]) {
             document.getElementById('podium-name-1').textContent = ranking[0].name;
-            document.getElementById('podium-pts-1').textContent = `${ranking[0].totalPoints.toFixed(1)} pts`;
+            document.getElementById('podium-pts-1').textContent = `${formatPoints(ranking[0].totalPoints)} pts`;
         }
         if (ranking[1]) {
             document.getElementById('podium-name-2').textContent = ranking[1].name;
-            document.getElementById('podium-pts-2').textContent = `${ranking[1].totalPoints.toFixed(1)} pts`;
+            document.getElementById('podium-pts-2').textContent = `${formatPoints(ranking[1].totalPoints)} pts`;
         }
 
-        const lastPlace = ranking.length > 0 ? ranking[ranking.length - 1] : null;
         const pNameLast = document.getElementById('podium-name-last');
-        if (lastPlace) {
-            pNameLast.textContent = lastPlace.name;
+        if (paqueteWinner) {
+            pNameLast.textContent = paqueteWinner.name;
         } else {
             pNameLast.textContent = '--';
         }
@@ -200,7 +220,7 @@ window.loadRanking = async function() {
             const specialUser = ranking[specialPosition - 1];
             if (podiumStepSpecial) podiumStepSpecial.style.display = '';
             pNameSpecial.textContent = `${specialPosition}º: ${specialUser.name}`;
-            pPtsSpecial.textContent = `${specialUser.totalPoints.toFixed(1)} pts`;
+            pPtsSpecial.textContent = `${formatPoints(specialUser.totalPoints)} pts`;
             if (pLabelSpecial) pLabelSpecial.textContent = `${specialPosition}º`;
         } else {
             if (podiumStepSpecial) podiumStepSpecial.style.display = 'none';
@@ -217,12 +237,12 @@ window.loadRanking = async function() {
             const isFirst = pos === 1;
             const isSecond = pos === 2;
             const isSpecial = specialPosition && pos === specialPosition;
-            const isLast = pos === ranking.length;
+            const isPaqueteWinner = paqueteWinner && user.userId === paqueteWinner.userId;
 
             let badgeHtml = '';
             if (isFirst) badgeHtml += '<span class="badge gold ml-2">🥇</span>';
             if (isSecond) badgeHtml += '<span class="badge silver ml-2">🥈</span>';
-            if (isLast && ranking.length > 2) badgeHtml += '<span class="badge bronze ml-2">💀</span>';
+            if (isPaqueteWinner && ranking.length > 2) badgeHtml += '<span class="badge bronze ml-2">💀</span>';
             if (isSpecial) badgeHtml += '<span class="badge spooky ml-2">👻</span>';
 
             const tr = document.createElement('tr');
@@ -236,10 +256,10 @@ window.loadRanking = async function() {
                 <td><strong>${pos}</strong></td>
                 <td>
                     ${user.name}
-                    ${user.hasMissedBet ? '<span title="No elegible para último puesto" style="color:var(--danger); font-size:0.8rem; margin-left: 8px;">(X)</span>' : ''}
+                    ${user.isPaqueteEligible ? '' : '<span title="No elegible para Premio Paquete (faltan apuestas en partidos cerrados)" style="color:var(--danger); font-size:0.8rem; margin-left: 8px;">(X)</span>'}
                     ${badgeHtml}
                 </td>
-                <td style="color:var(--primary); font-weight: 800;">${user.totalPoints.toFixed(1)}</td>
+                <td style="color:var(--primary); font-weight: 800;">${formatPoints(user.totalPoints)}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -258,7 +278,7 @@ window.loadRanking = async function() {
             tr.innerHTML = `
                 <td><strong>${index + 1}</strong></td>
                 <td>${entry.name}</td>
-                <td style="text-align: center; color:var(--primary); font-weight: 800;">⚽ ${entry.points.toFixed(1)}</td>
+                <td style="text-align: center; color:var(--primary); font-weight: 800;">⚽ ${formatPoints(entry.points)}</td>
             `;
             pichTbody.appendChild(tr);
         });

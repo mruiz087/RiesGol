@@ -214,6 +214,10 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
         console.error('PichichiScoring no cargado');
         return document.createElement('div');
     }
+
+    const round2 = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
+    const formatPoints = (n) => round2(n).toFixed(2);
+
     const isPast = new Date(match.fecha_inicio) < new Date();
     const isUndefined = match.equipo_local_nombre === 'Por definir' || match.equipo_visitante_nombre === 'Por definir';
     const disableBets = isPast || isUndefined;
@@ -250,28 +254,28 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
             `${b.teamName}: ${b.goals} gol${b.goals !== 1 ? 'es' : ''} × fase x${b.multiplier} × valor ${b.goalFactor.toFixed(2)}`
         );
 
-        const totalPoints = betPointsEarned + pichichiPointsEarned;
+        const totalPoints = round2(betPointsEarned + pichichiPointsEarned);
 
         let breakdownHtml = '';
         if (userBet) {
             breakdownHtml += `<div class="match-points-line">${betResult
-                ? `Apuesta: <strong>+${betPointsEarned} pts</strong> (acierto)`
-                : `Apuesta: <strong>0 pts</strong> (fallo)`}</div>`;
+                ? `Apuesta: <strong>+${formatPoints(betPointsEarned)} pts</strong> (acierto)`
+                : `Apuesta: <strong>${formatPoints(0)} pts</strong> (fallo)`}</div>`;
         } else {
-            breakdownHtml += `<div class="match-points-line">Apuesta: <strong>0 pts</strong> (sin apuesta)</div>`;
+            breakdownHtml += `<div class="match-points-line">Apuesta: <strong>${formatPoints(0)} pts</strong> (sin apuesta)</div>`;
         }
 
         if (pichichiResult.hasFavorite) {
             const pichDetail = pichichiBreakdownLines.length > 0
                 ? ` — ${pichichiBreakdownLines.join('; ')}`
                 : '';
-            breakdownHtml += `<div class="match-points-line">Pichichi: <strong>+${pichichiPointsEarned.toFixed(1)} pts</strong>${pichDetail}</div>`;
+            breakdownHtml += `<div class="match-points-line">Pichichi: <strong>+${formatPoints(pichichiPointsEarned)} pts</strong>${pichDetail}</div>`;
         }
 
         matchPointsHtml = `
             <details class="match-points-details">
                 <summary class="match-points-summary">
-                    <span class="match-points-total">+${totalPoints.toFixed(1)} pts en este partido</span>
+                    <span class="match-points-total">+${formatPoints(totalPoints)} pts en este partido</span>
                     <span class="match-points-chevron">›</span>
                 </summary>
                 <div class="match-points-breakdown">${breakdownHtml}</div>

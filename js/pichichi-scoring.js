@@ -11,6 +11,10 @@ const PHASE_MULTIPLIERS = {
     'FINAL': 6
 };
 
+function round2(n) {
+    return Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
+}
+
 function normalizeName(name) {
     if (!name) return '';
     return name.trim().toLowerCase();
@@ -154,7 +158,7 @@ function calcSelectionMatchPoints(match, selection, maxFifaPoints, teamsFifaMap,
     const teamFifa = getSelectionFifaPoints(selection, teamsFifaMap);
     const goalFactor = maxFifaPoints / teamFifa;
     const multiplier = getPhaseMultiplier(match.fase);
-    const points = goals * multiplier * goalFactor;
+    const points = round2(goals * multiplier * goalFactor);
 
     return {
         points,
@@ -181,13 +185,13 @@ function calcUserPichichi(selections, matches, maxFifaPoints, teamsFifaMap, team
         selections.forEach(selection => {
             const result = calcSelectionMatchPoints(match, selection, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
             if (result.played) {
-                matchTotal += result.points;
+                matchTotal = round2(matchTotal + result.points);
                 breakdown.push(result);
             }
         });
 
         if (breakdown.length > 0) {
-            total += matchTotal;
+            total = round2(total + matchTotal);
             perMatch.push({ matchId: match.id, points: matchTotal, breakdown });
         }
     });
@@ -206,12 +210,12 @@ function calcMatchPichichiForUser(match, selections, maxFifaPoints, teamsFifaMap
     selections.forEach(selection => {
         const result = calcSelectionMatchPoints(match, selection, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
         if (result.played) {
-            total += result.points;
+            total = round2(total + result.points);
             breakdown.push(result);
         }
     });
 
-    return { total, breakdown, hasFavorite: breakdown.length > 0 };
+    return { total: round2(total), breakdown, hasFavorite: breakdown.length > 0 };
 }
 
 async function loadTeamAliases() {
@@ -228,6 +232,7 @@ async function loadTeamAliases() {
 
 window.PichichiScoring = {
     PHASE_MULTIPLIERS,
+    round2,
     normalizeName,
     getPhaseMultiplier,
     getSelectionTeamId,
