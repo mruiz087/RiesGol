@@ -84,12 +84,12 @@ async function handleAuth(e) {
                 if (profileError) throw profileError;
             }
             currentUser = data.user;
-            alert("Cuenta creada con éxito.");
+            window.toast?.success("Cuenta creada con éxito.");
         }
         
         onLoginSuccess();
     } catch (error) {
-        alert("Error de autenticación: " + error.message);
+        window.toast?.error("Error de autenticación: " + error.message);
     } finally {
         window.hideLoading();
     }

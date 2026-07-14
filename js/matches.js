@@ -115,14 +115,17 @@ window.loadMatches = async function() {
         let teamsNameToId = {};
         let aliasMap = {};
 
-        const teams = await window.apiClient.getTeams();
-        if (teams && teams.length > 0) {
-            maxFifaPoints = Math.max(...teams.map(t => t.puntos_fifa));
+        const teamsCatalog = await window.apiClient.getTeams(tournamentId);
+        const groupValues = await window.apiClient.getGroupTeamValues(groupId);
+
+        if (teamsCatalog && teamsCatalog.length > 0 && groupValues?.length) {
+            const fifaValues = groupValues.map(gv => Number(gv.valor)).filter(v => Number.isFinite(v) && v > 0);
+            maxFifaPoints = fifaValues.length > 0 ? Math.max(...fifaValues) : 1000;
         }
 
         if (user && window.supabaseClient && window.PichichiScoring) {
             const aliases = await window.PichichiScoring.loadTeamAliases();
-            const maps = window.PichichiScoring.buildTeamMaps(teams || [], aliases);
+            const maps = window.PichichiScoring.buildTeamMaps(teamsCatalog || [], groupValues || [], aliases);
             teamsFifaMap = maps.teamsFifaMap;
             teamsNameToId = maps.teamsNameToId;
             aliasMap = maps.aliasMap;
@@ -143,7 +146,7 @@ window.loadMatches = async function() {
 
             const { data: selections, error: selError } = await window.supabaseClient
                 .from('favorite_selections')
-                .select('*, teams(id, nombre, puntos_fifa)')
+                .select('*, teams(id, nombre)')
                 .eq('user_id', user.id)
                 .eq('group_id', groupId);
             if (selError) console.error('Error cargando selecciones Pichichi:', selError);
@@ -406,12 +409,12 @@ async function submitBet(matchId, prediccion) {
     const groupId = window.Groups?.currentGroupId;
     
     if (!user || !window.supabaseClient) {
-        alert("Debes iniciar sesión para apostar.");
+        window.toast?.error("Debes iniciar sesión para apostar.");
         return;
     }
 
     if (!groupId) {
-        alert("Debes seleccionar una porra primero.");
+        window.toast?.warning("Debes seleccionar una porra primero.");
         return;
     }
 
@@ -470,7 +473,7 @@ async function submitBet(matchId, prediccion) {
 
     } catch (err) {
         console.error("Error guardando apuesta", err);
-        alert("Error al guardar: " + (err.message || "Revisa tu conexión."));
+        window.toast?.error("Error al guardar: " + (err.message || "Revisa tu conexión."));
     }
 }
 

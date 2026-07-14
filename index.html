@@ -42,6 +42,9 @@
             <div class="spinner"></div>
         </div>
 
+        <!-- Toasts -->
+        <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
         <main id="main-content">
             <!-- Login/Register View -->
             <section id="login-view" class="view active">
@@ -207,7 +210,6 @@
             <section id="matches-view" class="view hidden">
                 <header class="view-header">
                     <h2>Próximos Partidos</h2>
-                    <p class="multiplicador-info">Fase actual: <strong id="current-phase-name">Grupos</strong> (Multiplicador: <span id="current-multiplier">x1</span>)</p>
                 </header>
                 
                 <div id="matches-container">
@@ -222,10 +224,10 @@
                     <p>Selecciona un equipo de cada bombo favorito. Sumarás todos los goles que marquen durante el torneo.</p>
                 </header>
                 
-                <button id="save-pichichi-btn" class="btn-primary mt-2">Guardar Equipos Pichichi</button>
                 <div class="bombos-grid" id="bombos-container">
                     <!-- JS Inyectará selectores de bombos aquí -->
                 </div>
+                <button id="save-pichichi-btn" class="btn-primary mt-2" style="display: none;">Guardar Equipos Pichichi</button>
             </section>
 
             <!-- Statistics View -->
@@ -311,6 +313,31 @@
                         </div>
                         <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar Configuración</button>
                     </form>
+
+                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+
+                    <h3 style="margin-bottom: 1rem;">Puntos FIFA / Coeficientes</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                        Asigna el <strong>valor</strong> y el <strong>bombo</strong> de cada equipo para esta porra.
+                        Los equipos se cargan automáticamente desde los partidos del torneo.
+                    </p>
+                    <form id="team-values-form">
+                        <div id="team-values-editor">
+                            <p class="text-muted">Cargando equipos…</p>
+                        </div>
+                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar configuración</button>
+                    </form>
+
+                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+
+                    <h3 style="margin-bottom: 1rem; color: var(--danger);">Zona peligrosa</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                        Como administrador puedes eliminar esta porra en cualquier momento.
+                        Se borrarán miembros, apuestas y selecciones asociadas.
+                    </p>
+                    <button id="delete-group-btn" class="btn-secondary" style="width: 100%; border-color: rgba(255,71,87,0.4);">
+                        Eliminar porra
+                    </button>
                 </div>
             </section>
 

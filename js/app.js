@@ -6,6 +6,72 @@ document.addEventListener('DOMContentLoaded', () => {
     registerServiceWorker();
 });
 
+// Toasts (mensajes amigables)
+window.toast = (function() {
+    const DEFAULT_MS = 3500;
+
+    function getContainer() {
+        return document.getElementById('toast-container');
+    }
+
+    function iconFor(type) {
+        if (type === 'success') return '✓';
+        if (type === 'error') return '!';
+        if (type === 'warning') return '⚠';
+        return 'ℹ';
+    }
+
+    function titleFor(type) {
+        if (type === 'success') return 'Listo';
+        if (type === 'error') return 'Error';
+        if (type === 'warning') return 'Atención';
+        return 'Info';
+    }
+
+    function show(type, message, opts = {}) {
+        const container = getContainer();
+        if (!container) return;
+
+        const ms = Number.isFinite(opts.ms) ? opts.ms : DEFAULT_MS;
+        const title = opts.title || titleFor(type);
+
+        const toastEl = document.createElement('div');
+        toastEl.className = `toast ${type}`;
+        toastEl.innerHTML = `
+            <div class="toast-icon">${iconFor(type)}</div>
+            <div class="toast-body">
+                <div class="toast-title">${title}</div>
+                <div class="toast-message"></div>
+            </div>
+            <button class="toast-close" type="button" aria-label="Cerrar">×</button>
+        `;
+
+        const msgEl = toastEl.querySelector('.toast-message');
+        msgEl.textContent = String(message || '');
+
+        const closeBtn = toastEl.querySelector('.toast-close');
+        const remove = () => {
+            if (!toastEl.isConnected) return;
+            toastEl.classList.add('hide');
+            setTimeout(() => toastEl.remove(), 180);
+        };
+
+        closeBtn.addEventListener('click', remove);
+        container.appendChild(toastEl);
+
+        if (ms > 0) setTimeout(remove, ms);
+        return toastEl;
+    }
+
+    return {
+        success: (msg, opts) => show('success', msg, opts),
+        error: (msg, opts) => show('error', msg, opts),
+        info: (msg, opts) => show('info', msg, opts),
+        warning: (msg, opts) => show('warning', msg, opts),
+        show
+    };
+})();
+
 function initApp() {
     // Inicializar módulos
     if (window.Groups) {
@@ -77,6 +143,7 @@ window.navigateTo = function(viewId) {
             window.Admin.loadGroupMembers();
             window.Admin.loadSpecialPrizeConfig();
             window.Admin.loadTournamentStatus();
+            window.Admin.loadTeamValuesEditor();
         }
         
         if (viewId === 'my-groups-view' && window.Groups) {

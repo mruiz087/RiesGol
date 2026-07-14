@@ -51,10 +51,44 @@ serve(async (req) => {
       return new Response(JSON.stringify({ message: "No hay partidos disponibles todavía." }), { status: 200 });
     }
 
-    // Obtener equipos para mapear nombres a IDs
+    // Recopilar equipos únicos del torneo y upsert en catálogo teams
+    const uniqueTeamNames = new Set<string>();
+    fixtures.forEach((item: any) => {
+      if (item.homeTeam?.name) uniqueTeamNames.add(item.homeTeam.name);
+      if (item.awayTeam?.name) uniqueTeamNames.add(item.awayTeam.name);
+    });
+
+    const teamsPayload = [...uniqueTeamNames].map(nombre => ({
+      nombre,
+      tournament_id: tournamentId,
+    }));
+
+    if (teamsPayload.length > 0) {
+      const { error: teamsError } = await supabase
+        .from('teams')
+        .upsert(teamsPayload, { onConflict: 'tournament_id,nombre', ignoreDuplicates: true });
+
+      if (teamsError) {
+        console.warn('Upsert teams fallback:', teamsError.message);
+        for (const row of teamsPayload) {
+          const { data: existing } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('tournament_id', tournamentId)
+            .eq('nombre', row.nombre)
+            .maybeSingle();
+          if (!existing) {
+            await supabase.from('teams').insert(row);
+          }
+        }
+      }
+    }
+
+    // Obtener equipos del torneo para mapear nombres a IDs
     const { data: teams } = await supabase
       .from('teams')
-      .select('id, nombre');
+      .select('id, nombre')
+      .eq('tournament_id', tournamentId);
 
     // Mapeo: nombre -> team_id
     const teamMap: { [key: string]: number } = {};

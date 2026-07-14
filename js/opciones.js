@@ -20,7 +20,7 @@ async function handleChangeName(e) {
 
     const user = window.getCurrentUser();
     if (!user || !window.supabaseClient) {
-        alert("Debes iniciar sesión para cambiar tu nombre.");
+        window.toast?.error("Debes iniciar sesión para cambiar tu nombre.");
         window.hideLoading();
         return;
     }
@@ -28,7 +28,7 @@ async function handleChangeName(e) {
     const newName = document.getElementById('new-name').value.trim();
 
     if (!newName) {
-        alert("Por favor, introduce un nombre válido.");
+        window.toast?.warning("Por favor, introduce un nombre válido.");
         window.hideLoading();
         return;
     }
@@ -41,12 +41,12 @@ async function handleChangeName(e) {
 
         if (error) throw error;
 
-        alert("Nombre actualizado correctamente.");
+        window.toast?.success("Nombre actualizado correctamente.");
         document.getElementById('new-name').value = '';
 
     } catch (error) {
         console.error("Error actualizando nombre:", error);
-        alert("Error al actualizar el nombre: " + error.message);
+        window.toast?.error("Error al actualizar el nombre: " + error.message);
     } finally {
         window.hideLoading();
     }

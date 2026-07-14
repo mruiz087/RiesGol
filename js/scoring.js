@@ -46,18 +46,16 @@ window.loadRanking = async function() {
         // ─── Obtener selecciones Pichichi del grupo ───────────────────
         const { data: favoriteSelections, error: favError } = await window.supabaseClient
             .from('favorite_selections')
-            .select('*, teams(id, nombre, puntos_fifa)')
+            .select('*, teams(id, nombre)')
             .eq('group_id', groupId);
 
         if (favError) console.error('Error cargando selecciones Pichichi:', favError);
 
-        // ─── Obtener equipos para puntos FIFA ─────────────────────────
-        const { data: teams } = await window.supabaseClient
-            .from('teams')
-            .select('id, nombre, puntos_fifa');
+        const teamsCatalog = await window.apiClient.getTeams(tournamentId);
+        const groupValues = await window.apiClient.getGroupTeamValues(groupId);
 
         const aliases = await window.PichichiScoring.loadTeamAliases();
-        const { teamsFifaMap, teamsNameToId, aliasMap } = window.PichichiScoring.buildTeamMaps(teams, aliases);
+        const { teamsFifaMap, teamsNameToId, aliasMap } = window.PichichiScoring.buildTeamMaps(teamsCatalog, groupValues, aliases);
 
         // ─── Obtener configuración de premio especial ─────────────────
         const { data: groupConfig } = await window.supabaseClient
@@ -165,7 +163,7 @@ window.loadRanking = async function() {
         }
 
         // ─── Calcular puntos Pichichi ───────────────────────────────────
-        if (matches && favoriteSelections && teams && window.PichichiScoring) {
+        if (matches && favoriteSelections && groupValues?.length && window.PichichiScoring) {
             const fifaValues = Object.values(teamsFifaMap);
             const maxFifaPoints = fifaValues.length > 0 ? Math.max(...fifaValues) : 1000;
 

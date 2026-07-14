@@ -42,10 +42,10 @@ function getSelectionTeamId(selection) {
 }
 
 function getSelectionFifaPoints(selection, teamsFifaMap) {
-    if (selection.teams?.puntos_fifa) return selection.teams.puntos_fifa;
     const teamId = getSelectionTeamId(selection);
     if (teamId && teamsFifaMap) {
-        return teamsFifaMap[teamId] ?? teamsFifaMap[String(teamId)] ?? 1000;
+        const val = teamsFifaMap[teamId] ?? teamsFifaMap[String(teamId)];
+        if (val != null && Number.isFinite(Number(val))) return Number(val);
     }
     return 1000;
 }
@@ -56,19 +56,27 @@ function getSelectionTeamName(selection) {
 
 /**
  * Construye mapas auxiliares desde listas de equipos y aliases.
- * teamsFifaMap: teamId -> puntos_fifa
+ * teamsFifaMap: teamId -> valor (desde group_team_values)
  * teamsNameToId: nombre normalizado -> teamId
  * aliasMap: api_name normalizado -> teamId
  */
-function buildTeamMaps(teams, aliases) {
+function buildTeamMaps(teams, groupTeamValues, aliases) {
     const teamsFifaMap = {};
     const teamsNameToId = {};
     const translations = window.TEAM_NAME_TRANSLATIONS || {};
 
+    if (groupTeamValues) {
+        groupTeamValues.forEach(gv => {
+            const valor = Number(gv.valor);
+            if (Number.isFinite(valor) && gv.team_id != null) {
+                teamsFifaMap[gv.team_id] = valor;
+                teamsFifaMap[String(gv.team_id)] = valor;
+            }
+        });
+    }
+
     if (teams) {
         teams.forEach(t => {
-            teamsFifaMap[t.id] = t.puntos_fifa;
-            teamsFifaMap[String(t.id)] = t.puntos_fifa;
             if (t.nombre) {
                 teamsNameToId[normalizeName(t.nombre)] = t.id;
                 for (const [enName, esName] of Object.entries(translations)) {

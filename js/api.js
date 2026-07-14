@@ -9,6 +9,7 @@ const API_SPORTS_KEY = 'TU_API_KEY_AQUI';
 const cache = {
     tournaments: null,
     teams: null,
+    groupTeamValues: null,
     cacheTime: null,
     CACHE_DURATION: 5 * 60 * 1000 // 5 minutos
 };
@@ -35,32 +36,61 @@ const API = {
         return data;
     },
 
-    // Obtener todos los equipos de Supabase (con caché)
-    getTeams: async () => {
+    // Obtener equipos de Supabase (con caché). Si hay soporte multi-torneo,
+    // filtra por tournamentId; si no, cae al comportamiento legacy.
+    getTeams: async (tournamentId = null) => {
         if (!window.supabaseClient) return [];
         
         // Verificar caché
         const now = Date.now();
-        if (cache.teams && cache.cacheTime && (now - cache.cacheTime) < cache.CACHE_DURATION) {
-            return cache.teams;
+        const cacheKey = tournamentId ? `t:${tournamentId}` : 'all';
+        if (cache.teams?.[cacheKey] && cache.cacheTime && (now - cache.cacheTime) < cache.CACHE_DURATION) {
+            return cache.teams[cacheKey];
         }
-        
-        const { data, error } = await window.supabaseClient
+
+        // Preparar query
+        let query = window.supabaseClient
             .from('teams')
             .select('*')
-            .order('puntos_fifa', { ascending: false });
-            
+            .order('nombre', { ascending: true });
+
+        if (tournamentId) {
+            query = query.eq('tournament_id', tournamentId);
+        }
+
+        let data = null;
+        let error = null;
+
+        ({ data, error } = await query);
+
+        if (error && tournamentId && /tournament_id/i.test(error.message || '')) {
+            ({ data, error } = await window.supabaseClient
+                .from('teams')
+                .select('*')
+                .order('nombre', { ascending: true }));
+        }
+
         if (error) {
             console.error("Error obteniendo equipos:", error);
             return [];
         }
-        
+
         // Actualizar caché
-        cache.teams = data;
+        if (!cache.teams) cache.teams = {};
+        cache.teams[cacheKey] = data;
         cache.cacheTime = now;
-        
+
         return data;
     },
+
+    // Obtener todos los equipos de Supabase (legacy)
+    getTeamsLegacy: async () => {
+        return await API.getTeams(null);
+    },
+
+    // ------------------------------------------------------------
+    // Nota: la implementación anterior de getTeams fue reemplazada.
+    // ------------------------------------------------------------
 
     // Obtener todos los torneos (con caché)
     getTournaments: async () => {
@@ -89,10 +119,148 @@ const API = {
         return data;
     },
 
+    // Valores/bombos configurados por porra
+    getGroupTeamValues: async (groupId) => {
+        if (!window.supabaseClient || !groupId) return [];
+
+        const cacheKey = `g:${groupId}`;
+        const now = Date.now();
+        if (cache.groupTeamValues?.[cacheKey] && cache.cacheTime && (now - cache.cacheTime) < cache.CACHE_DURATION) {
+            return cache.groupTeamValues[cacheKey];
+        }
+
+        const { data, error } = await window.supabaseClient
+            .from('group_team_values')
+            .select('*, teams(id, nombre)')
+            .eq('group_id', groupId);
+
+        if (error) {
+            console.error('Error obteniendo group_team_values:', error);
+            return [];
+        }
+
+        if (!cache.groupTeamValues) cache.groupTeamValues = {};
+        cache.groupTeamValues[cacheKey] = data || [];
+        cache.cacheTime = now;
+        return data || [];
+    },
+
+    upsertGroupTeamValues: async (groupId, rows) => {
+        if (!window.supabaseClient || !groupId) return { error: 'Datos incompletos' };
+
+        const payload = rows.map(r => ({
+            group_id: groupId,
+            team_id: r.team_id,
+            valor: r.valor,
+            bombo: r.bombo,
+            updated_at: new Date().toISOString()
+        }));
+
+        const { error: directError } = await window.supabaseClient
+            .from('group_team_values')
+            .upsert(payload, { onConflict: 'group_id,team_id' });
+
+        if (!directError) {
+            API.clearCache();
+            return { success: true, count: rows.length };
+        }
+
+        const isPermissionError = /permission|policy|42501|403|Forbidden/i.test(directError.message || '');
+        if (!isPermissionError) {
+            console.error('Error guardando group_team_values:', directError);
+            return { error: directError.message || 'Error al guardar' };
+        }
+
+        // Fallback: Edge Function con service role (requiere despliegue)
+        const { data, error: fnError } = await window.supabaseClient.functions.invoke('upsert-group-team-values', {
+            body: { groupId, rows }
+        });
+
+        if (fnError) {
+            console.error('Error guardando group_team_values (directo y función):', directError, fnError);
+            return {
+                error: 'Sin permisos para guardar. Ejecuta docs/migrations/2026-07-13_fix_group_team_values_rls.sql en Supabase.'
+            };
+        }
+
+        if (data?.error) {
+            return { error: data.error };
+        }
+
+        API.clearCache();
+        return { success: true, count: data?.count ?? rows.length };
+    },
+
+    // Asegurar filas en teams a partir de nombres en matches del torneo
+    ensureTeamsFromMatches: async (tournamentId) => {
+        if (!window.supabaseClient || !tournamentId) return { inserted: 0 };
+
+        const matches = await API.getMatches(tournamentId);
+        const names = new Set();
+
+        matches.forEach(m => {
+            if (m.equipo_local_nombre && m.equipo_local_nombre !== 'Por definir') {
+                names.add(m.equipo_local_nombre.trim());
+            }
+            if (m.equipo_visitante_nombre && m.equipo_visitante_nombre !== 'Por definir') {
+                names.add(m.equipo_visitante_nombre.trim());
+            }
+        });
+
+        if (names.size === 0) return { inserted: 0 };
+
+        const payload = [...names].map(nombre => ({ nombre, tournament_id: tournamentId }));
+        const { error } = await window.supabaseClient
+            .from('teams')
+            .upsert(payload, { onConflict: 'tournament_id,nombre', ignoreDuplicates: true });
+
+        if (error) {
+            console.warn('ensureTeamsFromMatches:', error.message);
+            // Fallback: insertar uno a uno si el upsert compuesto falla
+            let inserted = 0;
+            for (const row of payload) {
+                const { data: existing } = await window.supabaseClient
+                    .from('teams')
+                    .select('id')
+                    .eq('tournament_id', tournamentId)
+                    .eq('nombre', row.nombre)
+                    .maybeSingle();
+                if (!existing) {
+                    const { error: insErr } = await window.supabaseClient
+                        .from('teams')
+                        .insert(row);
+                    if (!insErr) inserted++;
+                }
+            }
+            API.clearCache();
+            return { inserted };
+        }
+
+        API.clearCache();
+        return { inserted: payload.length };
+    },
+
+    mergeTeamsWithGroupValues: (teams, groupValues) => {
+        const byTeamId = {};
+        (groupValues || []).forEach(gv => {
+            byTeamId[gv.team_id] = gv;
+        });
+
+        return (teams || []).map(team => {
+            const cfg = byTeamId[team.id];
+            return {
+                ...team,
+                valor: cfg ? Number(cfg.valor) : null,
+                bombo: cfg?.bombo || null
+            };
+        });
+    },
+
     // Limpiar caché (útil después de actualizaciones)
     clearCache: () => {
         cache.teams = null;
         cache.tournaments = null;
+        cache.groupTeamValues = null;
         cache.cacheTime = null;
     },
 
@@ -143,12 +311,10 @@ const API = {
 
     // Crear un nuevo grupo (porra)
     createGroup: async (nombre, tournamentId, userId) => {
-        if (!window.supabaseClient) return null;
+        if (!window.supabaseClient) return { error: 'Supabase no configurado' };
         
-        // Generar código único de 6 caracteres
         const codigo = Math.random().toString(36).substring(2, 8).toUpperCase();
         
-        // Crear el grupo
         const { data: group, error: groupError } = await window.supabaseClient
             .from('groups')
             .insert({
@@ -162,10 +328,9 @@ const API = {
         
         if (groupError) {
             console.error("Error creando grupo:", groupError);
-            return null;
+            return { error: groupError.message || 'Error creando la porra' };
         }
         
-        // Añadir al creador como admin
         const { error: memberError } = await window.supabaseClient
             .from('group_members')
             .insert({
@@ -176,10 +341,12 @@ const API = {
         
         if (memberError) {
             console.error("Error añadiendo admin al grupo:", memberError);
-            return null;
+            // Limpiar porra huérfana si falló el alta del miembro
+            await window.supabaseClient.from('groups').delete().eq('id', group.id);
+            return { error: memberError.message || 'Error añadiendo admin a la porra' };
         }
         
-        return group;
+        return { group };
     },
 
     // Unirse a un grupo por código
@@ -260,36 +427,54 @@ const API = {
         return data;
     },
 
-    // Promover usuario a admin
-    promoteToAdmin: async (groupId, userId) => {
-        if (!window.supabaseClient) return false;
-        const { error } = await window.supabaseClient
-            .from('group_members')
-            .update({ role: 'admin' })
-            .eq('group_id', groupId)
-            .eq('user_id', userId);
-        
+    // Helper: invocar Edge Function y extraer mensaje de error real
+    invokeEdgeFunction: async (name, body) => {
+        if (!window.supabaseClient) return { error: 'Supabase no configurado' };
+
+        const { data, error } = await window.supabaseClient.functions.invoke(name, { body });
+
+        if (data?.error) return { error: data.error };
+
         if (error) {
-            console.error("Error promoviendo a admin:", error);
-            return false;
+            let message = error.message || 'Error en Edge Function';
+            try {
+                if (error.context && typeof error.context.json === 'function') {
+                    const payload = await error.context.json();
+                    if (payload?.error) message = payload.error;
+                }
+            } catch (_) { /* ignore parse errors */ }
+            console.error(`Edge Function ${name}:`, message, error);
+            return { error: message };
         }
-        return true;
+
+        return { success: true, data };
     },
 
-    // Degradar admin a member
-    demoteFromAdmin: async (groupId, userId) => {
-        if (!window.supabaseClient) return false;
+    // Expulsar usuario (solo admins) vía Edge Function
+    kickMember: async (groupId, userIdToKick) => {
+        const result = await API.invokeEdgeFunction('kick-member', { groupId: Number(groupId), userIdToKick });
+        if (result.success) return { success: true, data: result.data };
+        return { error: result.error || 'Error expulsando miembro' };
+    },
+
+    // Eliminar porra (solo admins) — Edge Function o borrado directo
+    deleteGroup: async (groupId) => {
+        const gid = Number(groupId);
+        if (!Number.isFinite(gid) || gid <= 0) return { error: 'Porra inválida' };
+
+        const fnResult = await API.invokeEdgeFunction('delete-group', { groupId: gid });
+        if (fnResult.success) return { success: true, data: fnResult.data };
+
+        const fnUnavailable = /failed to send|edge function|fetch|not found|404/i.test(fnResult.error || '');
+        if (!fnUnavailable) return { error: fnResult.error };
+
         const { error } = await window.supabaseClient
-            .from('group_members')
-            .update({ role: 'member' })
-            .eq('group_id', groupId)
-            .eq('user_id', userId);
-        
-        if (error) {
-            console.error("Error degradando a member:", error);
-            return false;
-        }
-        return true;
+            .from('groups')
+            .delete()
+            .eq('id', gid);
+
+        if (error) return { error: error.message || 'No se pudo eliminar la porra' };
+        return { success: true };
     },
 
     // Actualizar premio especial del grupo

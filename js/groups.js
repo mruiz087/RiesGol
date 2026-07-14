@@ -109,20 +109,20 @@ const Groups = {
         const user = window.currentUser;
         if (!user) {
             console.error('createGroup - No hay usuario');
-            alert('Debes iniciar sesión para crear una porra');
+            window.toast?.error('Debes iniciar sesión para crear una porra');
             return;
         }
 
         console.log('createGroup - Llamando a apiClient.createGroup');
-        const group = await window.apiClient.createGroup(nombre, tournamentId, user.id);
-        console.log('createGroup - Resultado:', group);
+        const result = await window.apiClient.createGroup(nombre, tournamentId, user.id);
+        console.log('createGroup - Resultado:', result);
         
-        if (group) {
-            alert(`Porra "${nombre}" creada con éxito. Código: ${group.codigo}`);
+        if (result?.group) {
+            window.toast?.success(`Porra "${nombre}" creada con éxito. Código: ${result.group.codigo}`);
             window.navigateTo('my-groups-view');
             Groups.loadUserGroups();
         } else {
-            alert('Error al crear la porra');
+            window.toast?.error(result?.error || 'Error al crear la porra');
         }
     },
 
@@ -132,7 +132,7 @@ const Groups = {
         const user = window.currentUser;
         if (!user) {
             console.error('joinGroup - No hay usuario');
-            alert('Debes iniciar sesión para unirte a una porra');
+            window.toast?.error('Debes iniciar sesión para unirte a una porra');
             return;
         }
 
@@ -141,11 +141,11 @@ const Groups = {
         console.log('joinGroup - Resultado:', result);
         
         if (result.success) {
-            alert(`Te has unido a la porra "${result.group.nombre}"`);
+            window.toast?.success(`Te has unido a la porra "${result.group.nombre}"`);
             window.navigateTo('my-groups-view');
             Groups.loadUserGroups();
         } else {
-            alert(result.error || 'Error al unirse a la porra');
+            window.toast?.error(result.error || 'Error al unirse a la porra');
         }
     },
 
@@ -169,7 +169,7 @@ const Groups = {
             const tournamentId = parseInt(document.getElementById('tournament-select').value);
             
             if (!nombre || !tournamentId) {
-                alert('Por favor completa todos los campos');
+                window.toast?.warning('Por favor completa todos los campos');
                 return;
             }
             
@@ -188,7 +188,7 @@ const Groups = {
             const codigo = document.getElementById('join-code').value;
             
             if (!codigo || codigo.length !== 6) {
-                alert('El código debe tener 6 caracteres');
+                window.toast?.warning('El código debe tener 6 caracteres');
                 return;
             }
             

@@ -52,10 +52,7 @@ const Admin = {
                             </td>
                             ${isCurrentUserAdmin && member.user_id !== currentUser?.id ? `
                                 <td>
-                                    ${member.role === 'admin' 
-                                        ? `<button class="btn-secondary btn-sm" onclick="Admin.demoteMember(${member.user_id})">Degradar</button>`
-                                        : `<button class="btn-primary btn-sm" onclick="Admin.promoteMember(${member.user_id})">Promover</button>`
-                                    }
+                                    <button class="btn-secondary btn-sm" onclick="Admin.kickMember('${member.user_id}')">Expulsar</button>
                                 </td>
                             ` : isCurrentUserAdmin ? '<td></td>' : ''}
                         </tr>
@@ -63,6 +60,22 @@ const Admin = {
                 </tbody>
             </table>
         `;
+    },
+
+    // Expulsar miembro del grupo
+    kickMember: async (userIdToKick) => {
+        const groupId = window.Groups?.currentGroupId;
+        if (!groupId) return;
+
+        if (!confirm('¿Seguro que quieres expulsar a este usuario de la porra?')) return;
+
+        const result = await window.apiClient.kickMember(groupId, userIdToKick);
+        if (result.success) {
+            window.toast?.success('Usuario expulsado de la porra');
+            Admin.loadGroupMembers();
+        } else {
+            window.toast?.error(result.error || 'No se pudo expulsar al usuario');
+        }
     },
 
     // Cargar configuración del premio especial
@@ -99,38 +112,6 @@ const Admin = {
         }
     },
 
-    // Promover miembro a admin
-    promoteMember: async (userId) => {
-        const groupId = window.Groups?.currentGroupId;
-        if (!groupId) return;
-
-        if (!confirm('¿Estás seguro de promover a este usuario a administrador?')) return;
-
-        const success = await window.apiClient.promoteToAdmin(groupId, userId);
-        if (success) {
-            alert('Usuario promovido a administrador');
-            Admin.loadGroupMembers();
-        } else {
-            alert('Error al promover usuario');
-        }
-    },
-
-    // Degradar admin a miembro
-    demoteMember: async (userId) => {
-        const groupId = window.Groups?.currentGroupId;
-        if (!groupId) return;
-
-        if (!confirm('¿Estás seguro de degradar a este usuario a miembro?')) return;
-
-        const success = await window.apiClient.demoteFromAdmin(groupId, userId);
-        if (success) {
-            alert('Usuario degradado a miembro');
-            Admin.loadGroupMembers();
-        } else {
-            alert('Error al degradar usuario. Puede que sea el último administrador.');
-        }
-    },
-
     // Guardar configuración de premio especial
     saveSpecialPrizeConfig: async (e) => {
         e.preventDefault();
@@ -142,15 +123,15 @@ const Admin = {
         const position = enabled ? parseInt(document.getElementById('special-position').value) : null;
 
         if (enabled && (!position || position < 1)) {
-            alert('Por favor ingresa una posición válida');
+            window.toast?.warning('Por favor ingresa una posición válida');
             return;
         }
 
         const success = await window.apiClient.updateSpecialPrize(groupId, enabled, position);
         if (success) {
-            alert('Configuración guardada');
+            window.toast?.success('Configuración guardada');
         } else {
-            alert('Error al guardar configuración');
+            window.toast?.error('Error al guardar configuración');
         }
     },
 
@@ -165,9 +146,181 @@ const Admin = {
 
         const success = await window.apiClient.updateTournamentStatus(tournamentId, status);
         if (success) {
-            alert('Estado del torneo actualizado');
+            window.toast?.success('Estado del torneo actualizado');
         } else {
-            alert('Error al actualizar estado del torneo');
+            window.toast?.error('Error al actualizar estado del torneo');
+        }
+    },
+
+    // Eliminar porra (hard delete)
+    deleteCurrentGroup: async () => {
+        const groupId = window.Groups?.currentGroupId;
+        if (!groupId) return;
+
+        if (!confirm('¿Seguro que quieres ELIMINAR la porra? Esta acción no se puede deshacer.')) return;
+
+        window.showLoading();
+        try {
+            const result = await window.apiClient.deleteGroup(groupId);
+            if (!result.success) {
+                window.toast?.error(result.error || 'No se pudo eliminar la porra');
+                return;
+            }
+
+            window.toast?.success('Porra eliminada');
+            // Salir del contexto de porra y volver a Mis Porras
+            window.Groups?.returnToList();
+            window.Groups?.loadUserGroups();
+        } finally {
+            window.hideLoading();
+        }
+    },
+
+    BOMBO_OPTIONS: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'],
+
+    buildBomboSelectOptions: (selected) => {
+        const opts = ['<option value="">—</option>'];
+        Admin.BOMBO_OPTIONS.forEach(letter => {
+            const sel = selected === letter ? ' selected' : '';
+            opts.push(`<option value="${letter}"${sel}>${letter}</option>`);
+        });
+        return opts.join('');
+    },
+
+    loadTeamValuesEditor: async () => {
+        const groupId = window.Groups?.currentGroupId;
+        const tournamentId = window.Groups?.currentTournamentId;
+        const container = document.getElementById('team-values-editor');
+        if (!container) return;
+
+        if (!groupId || !tournamentId) {
+            container.innerHTML = '<p class="text-muted">Selecciona una porra primero.</p>';
+            return;
+        }
+
+        container.innerHTML = '<p class="text-muted">Cargando equipos…</p>';
+
+        await window.apiClient.ensureTeamsFromMatches(tournamentId);
+
+        const teams = await window.apiClient.getTeams(tournamentId);
+        const groupValues = await window.apiClient.getGroupTeamValues(groupId);
+        const valuesByTeamId = {};
+        (groupValues || []).forEach(gv => { valuesByTeamId[gv.team_id] = gv; });
+
+        if (!teams || teams.length === 0) {
+            container.innerHTML = `
+                <p class="text-muted">
+                    No hay equipos en el catálogo. Sincroniza los partidos del torneo primero
+                    (Edge Function <code>sync-matches</code>).
+                </p>
+            `;
+            return;
+        }
+
+        const displayName = (name) => {
+            if (typeof window.translateTeamName === 'function') {
+                return window.translateTeamName(name);
+            }
+            return name;
+        };
+
+        const rows = teams.map(team => {
+            const cfg = valuesByTeamId[team.id];
+            const valor = cfg?.valor != null ? Number(cfg.valor).toFixed(2) : '';
+            const bombo = cfg?.bombo || '';
+            return `
+                <tr data-team-id="${team.id}">
+                    <td>${displayName(team.nombre)}</td>
+                    <td>
+                        <input type="number" class="team-valor-input" step="0.01" min="0"
+                               value="${valor}" placeholder="0.00"
+                               style="width: 100%; max-width: 120px;">
+                    </td>
+                    <td>
+                        <select class="team-bombo-select" style="width: 100%; max-width: 80px;">
+                            ${Admin.buildBomboSelectOptions(bombo)}
+                        </select>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div style="overflow-x: auto;">
+                <table class="premium-table">
+                    <thead>
+                        <tr>
+                            <th>Equipo</th>
+                            <th>Valor</th>
+                            <th>Bombo</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <p style="color: var(--text-muted); margin-top: 0.75rem; font-size: 0.9rem;">
+                ${teams.length} equipos · Los cambios recalculan puntuaciones Pichichi al instante.
+            </p>
+        `;
+    },
+
+    saveTeamValues: async (e) => {
+        e.preventDefault();
+
+        const groupId = window.Groups?.currentGroupId;
+        if (!groupId) {
+            window.toast?.warning('Selecciona una porra primero.');
+            return;
+        }
+
+        const rows = [];
+        const errors = [];
+
+        document.querySelectorAll('#team-values-editor tbody tr[data-team-id]').forEach((tr, idx) => {
+            const teamId = parseInt(tr.getAttribute('data-team-id'), 10);
+            const valorRaw = tr.querySelector('.team-valor-input')?.value?.trim();
+            const bombo = tr.querySelector('.team-bombo-select')?.value?.trim().toUpperCase() || '';
+
+            if (!valorRaw && !bombo) return;
+
+            const valor = Number(String(valorRaw).replace(',', '.'));
+            if (!Number.isFinite(valor) || valor <= 0) {
+                errors.push(`Fila ${idx + 1}: valor inválido`);
+                return;
+            }
+            if (!bombo || !/^[A-Z]$/.test(bombo)) {
+                errors.push(`Fila ${idx + 1}: selecciona un bombo (A–L)`);
+                return;
+            }
+
+            rows.push({
+                team_id: teamId,
+                valor: Math.round((valor + Number.EPSILON) * 100) / 100,
+                bombo
+            });
+        });
+
+        if (errors.length > 0) {
+            window.toast?.error(errors[0]);
+            return;
+        }
+
+        if (rows.length === 0) {
+            window.toast?.warning('Rellena al menos un equipo con valor y bombo.');
+            return;
+        }
+
+        window.showLoading();
+        try {
+            const result = await window.apiClient.upsertGroupTeamValues(groupId, rows);
+            if (result.error) {
+                window.toast?.error(result.error);
+                return;
+            }
+            window.toast?.success(`Configuración guardada (${rows.length} equipos)`);
+            Admin.loadTeamValuesEditor();
+        } finally {
+            window.hideLoading();
         }
     },
 
@@ -198,6 +351,12 @@ const Admin = {
 
         // Formulario de estado del torneo
         document.getElementById('tournament-status-form')?.addEventListener('submit', Admin.saveTournamentStatus);
+
+        // Formulario de valores por equipo (Puntos FIFA / Coeficientes)
+        document.getElementById('team-values-form')?.addEventListener('submit', Admin.saveTeamValues);
+
+        // Eliminar porra (zona peligrosa)
+        document.getElementById('delete-group-btn')?.addEventListener('click', Admin.deleteCurrentGroup);
     }
 };
 
