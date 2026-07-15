@@ -4,10 +4,129 @@
 const Groups = {
     currentGroupId: null,
     currentTournamentId: null,
+    selectedTournamentId: null,
 
     getTournamentStatusLabel: (estado) => {
         if (estado === 'finished') return { text: 'Finalizada', className: 'finished' };
+        if (estado === 'draft') return { text: 'Borrador', className: 'draft' };
         return { text: 'Activa', className: 'active' };
+    },
+
+    getTournamentPickerStatus: (estado) => {
+        const map = {
+            draft: { text: 'Borrador', className: 'draft' },
+            active: { text: 'Activo', className: 'active' },
+            finished: { text: 'Finalizado', className: 'finished' },
+            archived: { text: 'Archivado', className: 'finished' }
+        };
+        return map[estado] || map.draft;
+    },
+
+    formatTournamentDateRange: (fechaInicio, fechaFin) => {
+        const fmt = (iso) => {
+            if (!iso) return null;
+            try {
+                return new Date(iso).toLocaleDateString('es-ES', {
+                    day: 'numeric', month: 'short', year: 'numeric'
+                });
+            } catch (_) {
+                return null;
+            }
+        };
+        const start = fmt(fechaInicio);
+        const end = fmt(fechaFin);
+        if (start && end) return `${start} – ${end}`;
+        if (start) return `Desde ${start}`;
+        if (end) return `Hasta ${end}`;
+        return 'Fechas por confirmar';
+    },
+
+    renderTournamentPicker: (tournaments, selectedId = null) => {
+        const picker = document.getElementById('tournament-picker');
+        const hidden = document.getElementById('tournament-id');
+        if (!picker) return;
+
+        if (!tournaments || tournaments.length === 0) {
+            picker.innerHTML = `
+                <p class="text-muted tournament-picker-empty">
+                    No hay torneos disponibles. Comprueba la API key y despliega <code>sync-tournaments</code>.
+                </p>
+            `;
+            if (hidden) hidden.value = '';
+            Groups.selectedTournamentId = null;
+            return;
+        }
+
+        picker.innerHTML = tournaments.map(t => {
+            const status = Groups.getTournamentPickerStatus(t.estado);
+            const dates = Groups.formatTournamentDateRange(t.fecha_inicio, t.fecha_fin);
+            const selected = selectedId === t.id ? ' selected' : '';
+            const tipoLabel = t.tipo === 'EURO' ? 'Eurocopa' : 'Mundial';
+            return `
+                <button type="button" class="tournament-card${selected}"
+                        data-tournament-id="${t.id}"
+                        aria-pressed="${selectedId === t.id}">
+                    <div class="tournament-card-top">
+                        <span class="tournament-card-badge ${status.className}">${status.text}</span>
+                        <span class="tournament-card-type">${tipoLabel}</span>
+                    </div>
+                    <h4 class="tournament-card-name">${t.nombre}</h4>
+                    <p class="tournament-card-year">${t.anio}</p>
+                    <p class="tournament-card-dates">${dates}</p>
+                </button>
+            `;
+        }).join('');
+
+        picker.querySelectorAll('.tournament-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const id = parseInt(card.dataset.tournamentId, 10);
+                Groups.selectTournamentCard(id);
+            });
+        });
+
+        if (selectedId) {
+            Groups.selectTournamentCard(selectedId, false);
+        }
+    },
+
+    selectTournamentCard: (tournamentId, updateDom = true) => {
+        Groups.selectedTournamentId = tournamentId;
+        const hidden = document.getElementById('tournament-id');
+        if (hidden) hidden.value = String(tournamentId);
+
+        if (!updateDom) return;
+
+        document.querySelectorAll('.tournament-card').forEach(card => {
+            const id = parseInt(card.dataset.tournamentId, 10);
+            const isSelected = id === tournamentId;
+            card.classList.toggle('selected', isSelected);
+            card.setAttribute('aria-pressed', String(isSelected));
+        });
+    },
+
+    resetTournamentPicker: () => {
+        Groups.selectedTournamentId = null;
+        const hidden = document.getElementById('tournament-id');
+        if (hidden) hidden.value = '';
+    },
+
+    // Cargar y sincronizar torneos disponibles (tarjetas)
+    loadTournaments: async () => {
+        const picker = document.getElementById('tournament-picker');
+        if (picker) {
+            picker.innerHTML = '<p class="text-muted tournament-picker-loading">Sincronizando torneos…</p>';
+        }
+
+        const { tournaments, error } = await window.apiClient.syncAvailableTournaments();
+
+        if (error) {
+            window.toast?.warning(`Sync torneos: ${error}. Mostrando datos en caché.`);
+            const cached = await window.apiClient.getTournaments();
+            Groups.renderTournamentPicker(cached, Groups.selectedTournamentId);
+            return;
+        }
+
+        Groups.renderTournamentPicker(tournaments, Groups.selectedTournamentId);
     },
 
     // Cargar las porras del usuario
@@ -89,20 +208,6 @@ const Groups = {
         window.navigateTo('my-groups-view');
     },
 
-    // Cargar torneos disponibles en el select
-    loadTournaments: async () => {
-        const tournaments = await window.apiClient.getTournaments();
-        const select = document.getElementById('tournament-select');
-        
-        if (!tournaments || tournaments.length === 0) {
-            select.innerHTML = '<option value="">No hay torneos disponibles</option>';
-            return;
-        }
-
-        select.innerHTML = '<option value="">Selecciona un torneo...</option>' +
-            tournaments.map(t => `<option value="${t.id}">${t.nombre} (${t.anio})</option>`).join('');
-    },
-
     // Crear una nueva porra
     createGroup: async (nombre, tournamentId) => {
         console.log('createGroup - Iniciando', { nombre, tournamentId });
@@ -166,19 +271,26 @@ const Groups = {
         document.getElementById('create-group-form')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const nombre = document.getElementById('group-name').value;
-            const tournamentId = parseInt(document.getElementById('tournament-select').value);
+            const tournamentId = parseInt(document.getElementById('tournament-id').value, 10);
             
             if (!nombre || !tournamentId) {
-                window.toast?.warning('Por favor completa todos los campos');
+                window.toast?.warning('Selecciona un torneo y escribe un nombre para la porra');
                 return;
             }
             
             await Groups.createGroup(nombre, tournamentId);
         });
 
+        document.getElementById('refresh-tournaments-btn')?.addEventListener('click', () => {
+            Groups.loadTournaments();
+        });
+
         // Cancelar crear porra
         document.getElementById('cancel-create-group')?.addEventListener('click', () => {
             document.getElementById('create-group-form').reset();
+            Groups.resetTournamentPicker();
+            document.getElementById('tournament-picker')?.querySelectorAll('.tournament-card')
+                .forEach(c => c.classList.remove('selected'));
             window.navigateTo('my-groups-view');
         });
 

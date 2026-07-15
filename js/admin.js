@@ -2,6 +2,8 @@
 // Lógica para la administración de porras
 
 const Admin = {
+    teamValuesSearchQuery: '',
+
     // Verificar si el usuario es admin del grupo actual
     isAdmin: async (groupId, userId) => {
         if (!groupId || !userId) return false;
@@ -96,6 +98,17 @@ const Admin = {
         }
     },
 
+    setSegmentedControlValue: (value) => {
+        const hidden = document.getElementById('tournament-status');
+        if (hidden) hidden.value = value || 'draft';
+
+        document.querySelectorAll('#tournament-status-control .segmented-control-btn').forEach(btn => {
+            const isActive = btn.dataset.value === (value || 'draft');
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-pressed', String(isActive));
+        });
+    },
+
     // Cargar estado del torneo
     loadTournamentStatus: async () => {
         const tournamentId = window.Groups?.currentTournamentId;
@@ -108,7 +121,7 @@ const Admin = {
             .single();
 
         if (tournament) {
-            document.getElementById('tournament-status').value = tournament.estado || 'draft';
+            Admin.setSegmentedControlValue(tournament.estado || 'draft');
         }
     },
 
@@ -168,7 +181,6 @@ const Admin = {
             }
 
             window.toast?.success('Porra eliminada');
-            // Salir del contexto de porra y volver a Mis Porras
             window.Groups?.returnToList();
             window.Groups?.loadUserGroups();
         } finally {
@@ -178,13 +190,190 @@ const Admin = {
 
     BOMBO_OPTIONS: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'],
 
-    buildBomboSelectOptions: (selected) => {
-        const opts = ['<option value="">—</option>'];
-        Admin.BOMBO_OPTIONS.forEach(letter => {
+    displayTeamName: (name) => {
+        if (typeof window.translateTeamName === 'function') {
+            return window.translateTeamName(name);
+        }
+        return name;
+    },
+
+    isTeamConfigured: (cfg) => {
+        if (!cfg) return false;
+        const valor = cfg.valor != null ? Number(cfg.valor) : NaN;
+        const bombo = (cfg.bombo || '').trim();
+        return Number.isFinite(valor) && valor > 0 && /^[A-Z]$/.test(bombo);
+    },
+
+    buildBomboChips: (teamId, selected) => {
+        return Admin.BOMBO_OPTIONS.map(letter => {
             const sel = selected === letter ? ' selected' : '';
-            opts.push(`<option value="${letter}"${sel}>${letter}</option>`);
+            return `<button type="button" class="bombo-chip${sel}" data-team-id="${teamId}" data-bombo="${letter}" aria-pressed="${selected === letter}">${letter}</button>`;
+        }).join('');
+    },
+
+    buildTeamRow: (team, cfg) => {
+        const valor = cfg?.valor != null ? Number(cfg.valor).toFixed(2) : '';
+        const bombo = cfg?.bombo || '';
+        const displayName = Admin.displayTeamName(team.nombre);
+        const searchKey = `${team.nombre} ${displayName}`.toLowerCase();
+
+        return `
+            <div class="admin-team-row" data-team-id="${team.id}" data-search="${searchKey}">
+                <div class="admin-team-info">
+                    <span class="admin-team-name">${displayName}</span>
+                </div>
+                <input type="number" class="team-valor-input admin-valor-input" step="0.01" min="0"
+                       value="${valor}" placeholder="0.00" inputmode="decimal">
+                <div class="bombo-chip-group" role="group" aria-label="Bombo de ${displayName}">
+                    ${Admin.buildBomboChips(team.id, bombo)}
+                </div>
+            </div>
+        `;
+    },
+
+    bindTeamValuesEditorEvents: (container) => {
+        container.querySelectorAll('.bombo-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const row = chip.closest('.admin-team-row');
+                if (!row) return;
+                row.querySelectorAll('.bombo-chip').forEach(c => {
+                    c.classList.remove('selected');
+                    c.setAttribute('aria-pressed', 'false');
+                });
+                chip.classList.add('selected');
+                chip.setAttribute('aria-pressed', 'true');
+            });
         });
-        return opts.join('');
+
+        const searchInput = document.getElementById('team-values-search');
+        if (searchInput && searchInput.dataset.bound !== '1') {
+            searchInput.dataset.bound = '1';
+            searchInput.value = Admin.teamValuesSearchQuery;
+            searchInput.addEventListener('input', (e) => {
+                Admin.teamValuesSearchQuery = e.target.value.trim().toLowerCase();
+                Admin.filterTeamRows(Admin.teamValuesSearchQuery);
+            });
+        }
+
+        container.querySelectorAll('.admin-accordion').forEach(accordion => {
+            accordion.addEventListener('toggle', (e) => {
+                const details = e.target;
+                if (!details.open || !(details instanceof HTMLDetailsElement)) return;
+                container.querySelectorAll('.admin-accordion').forEach(other => {
+                    if (other !== details) other.open = false;
+                });
+            });
+        });
+    },
+
+    filterTeamRows: (query) => {
+        const container = document.getElementById('team-values-editor');
+        if (!container) return;
+
+        container.querySelectorAll('.admin-team-row').forEach(row => {
+            const key = row.getAttribute('data-search') || '';
+            const match = !query || key.includes(query);
+            row.classList.toggle('hidden-by-search', !match);
+        });
+
+        container.querySelectorAll('.admin-accordion').forEach(section => {
+            const visible = section.querySelectorAll('.admin-team-row:not(.hidden-by-search)').length;
+            section.classList.toggle('admin-accordion-empty', visible === 0 && !!query);
+        });
+    },
+
+    syncMatchesForTournament: async (tournamentId, { silent = false } = {}) => {
+        if (!silent) {
+            window.toast?.info('Sincronizando partidos…');
+        }
+
+        const result = await window.apiClient.syncMatches(tournamentId);
+
+        if (result.error) {
+            window.toast?.error(result.error);
+            return { success: false, matchCount: 0 };
+        }
+
+        if (!silent) {
+            if (result.matchCount === 0) {
+                window.toast?.warning(
+                    'No se encontraron partidos. Comprueba que el año del torneo (anio) sea correcto o que la API tenga datos disponibles.'
+                );
+            } else {
+                window.toast?.success(result.message || `Sincronizados ${result.matchCount} partidos`);
+            }
+        }
+
+        return { success: true, matchCount: result.matchCount ?? 0 };
+    },
+
+    renderTeamValuesEditor: (container, teams, groupValues) => {
+        const valuesByTeamId = {};
+        (groupValues || []).forEach(gv => { valuesByTeamId[gv.team_id] = gv; });
+
+        const configuredCount = teams.filter(t => Admin.isTeamConfigured(valuesByTeamId[t.id])).length;
+        const unassigned = [];
+        const byBombo = {};
+        Admin.BOMBO_OPTIONS.forEach(b => { byBombo[b] = []; });
+
+        teams.forEach(team => {
+            const cfg = valuesByTeamId[team.id];
+            if (!Admin.isTeamConfigured(cfg)) {
+                unassigned.push(team);
+                return;
+            }
+            const bombo = cfg.bombo.toUpperCase();
+            if (byBombo[bombo]) byBombo[bombo].push(team);
+            else unassigned.push(team);
+        });
+
+        const buildSection = (title, teamList, openByDefault) => {
+            if (!teamList.length) return '';
+            const rows = teamList.map(t => Admin.buildTeamRow(t, valuesByTeamId[t.id])).join('');
+            return `
+                <details class="admin-accordion"${openByDefault ? ' open' : ''}>
+                    <summary class="admin-accordion-summary">
+                        <span>${title}</span>
+                        <span class="admin-accordion-count">${teamList.length}</span>
+                    </summary>
+                    <div class="admin-accordion-body">${rows}</div>
+                </details>
+            `;
+        };
+
+        const bomboSections = Admin.BOMBO_OPTIONS
+            .map(b => buildSection(`Bombo ${b}`, byBombo[b], false))
+            .join('');
+
+        container.innerHTML = `
+            <div class="admin-team-values-toolbar">
+                <input type="search" id="team-values-search" class="admin-search-input"
+                       placeholder="Buscar equipo…" autocomplete="off">
+                <div class="admin-progress">
+                    <span class="admin-progress-value">${configuredCount} / ${teams.length}</span>
+                    <span class="admin-progress-label">equipos configurados</span>
+                </div>
+            </div>
+            ${buildSection('Sin asignar', unassigned, unassigned.length > 0)}
+            ${bomboSections}
+            <p class="admin-team-values-hint">
+                Los cambios recalculan puntuaciones Pichichi al instante.
+            </p>
+        `;
+
+        Admin.bindTeamValuesEditorEvents(container);
+        if (Admin.teamValuesSearchQuery) {
+            Admin.filterTeamRows(Admin.teamValuesSearchQuery);
+        }
+    },
+
+    showNoTeamsMessage: (container) => {
+        container.innerHTML = `
+            <p class="text-muted">
+                No hay equipos en el catálogo. Pulsa <strong>Sincronizar partidos</strong> para descargarlos
+                desde football-data.org. Si el torneo aún no tiene calendario publicado, no habrá equipos disponibles.
+            </p>
+        `;
     },
 
     loadTeamValuesEditor: async () => {
@@ -200,68 +389,24 @@ const Admin = {
 
         container.innerHTML = '<p class="text-muted">Cargando equipos…</p>';
 
+        let matches = await window.apiClient.getMatches(tournamentId);
+
+        if (!matches || matches.length === 0) {
+            await Admin.syncMatchesForTournament(tournamentId);
+            matches = await window.apiClient.getMatches(tournamentId);
+        }
+
         await window.apiClient.ensureTeamsFromMatches(tournamentId);
 
-        const teams = await window.apiClient.getTeams(tournamentId);
+        let teams = await window.apiClient.getTeams(tournamentId);
         const groupValues = await window.apiClient.getGroupTeamValues(groupId);
-        const valuesByTeamId = {};
-        (groupValues || []).forEach(gv => { valuesByTeamId[gv.team_id] = gv; });
 
         if (!teams || teams.length === 0) {
-            container.innerHTML = `
-                <p class="text-muted">
-                    No hay equipos en el catálogo. Sincroniza los partidos del torneo primero
-                    (Edge Function <code>sync-matches</code>).
-                </p>
-            `;
+            Admin.showNoTeamsMessage(container);
             return;
         }
 
-        const displayName = (name) => {
-            if (typeof window.translateTeamName === 'function') {
-                return window.translateTeamName(name);
-            }
-            return name;
-        };
-
-        const rows = teams.map(team => {
-            const cfg = valuesByTeamId[team.id];
-            const valor = cfg?.valor != null ? Number(cfg.valor).toFixed(2) : '';
-            const bombo = cfg?.bombo || '';
-            return `
-                <tr data-team-id="${team.id}">
-                    <td>${displayName(team.nombre)}</td>
-                    <td>
-                        <input type="number" class="team-valor-input" step="0.01" min="0"
-                               value="${valor}" placeholder="0.00"
-                               style="width: 100%; max-width: 120px;">
-                    </td>
-                    <td>
-                        <select class="team-bombo-select" style="width: 100%; max-width: 80px;">
-                            ${Admin.buildBomboSelectOptions(bombo)}
-                        </select>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-
-        container.innerHTML = `
-            <div style="overflow-x: auto;">
-                <table class="premium-table">
-                    <thead>
-                        <tr>
-                            <th>Equipo</th>
-                            <th>Valor</th>
-                            <th>Bombo</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            </div>
-            <p style="color: var(--text-muted); margin-top: 0.75rem; font-size: 0.9rem;">
-                ${teams.length} equipos · Los cambios recalculan puntuaciones Pichichi al instante.
-            </p>
-        `;
+        Admin.renderTeamValuesEditor(container, teams, groupValues);
     },
 
     saveTeamValues: async (e) => {
@@ -276,10 +421,11 @@ const Admin = {
         const rows = [];
         const errors = [];
 
-        document.querySelectorAll('#team-values-editor tbody tr[data-team-id]').forEach((tr, idx) => {
-            const teamId = parseInt(tr.getAttribute('data-team-id'), 10);
-            const valorRaw = tr.querySelector('.team-valor-input')?.value?.trim();
-            const bombo = tr.querySelector('.team-bombo-select')?.value?.trim().toUpperCase() || '';
+        document.querySelectorAll('#team-values-editor .admin-team-row[data-team-id]').forEach((rowEl, idx) => {
+            const teamId = parseInt(rowEl.getAttribute('data-team-id'), 10);
+            const valorRaw = rowEl.querySelector('.team-valor-input')?.value?.trim();
+            const selectedChip = rowEl.querySelector('.bombo-chip.selected');
+            const bombo = selectedChip?.dataset?.bombo?.trim().toUpperCase() || '';
 
             if (!valorRaw && !bombo) return;
 
@@ -341,24 +487,36 @@ const Admin = {
 
     // Inicializar event listeners
     init: () => {
-        // Checkbox de premio especial
         document.getElementById('special-prize-enabled')?.addEventListener('change', (e) => {
             document.getElementById('special-position-group').style.display = e.target.checked ? 'block' : 'none';
         });
 
-        // Formulario de premio especial
         document.getElementById('special-prize-form')?.addEventListener('submit', Admin.saveSpecialPrizeConfig);
-
-        // Formulario de estado del torneo
         document.getElementById('tournament-status-form')?.addEventListener('submit', Admin.saveTournamentStatus);
-
-        // Formulario de valores por equipo (Puntos FIFA / Coeficientes)
         document.getElementById('team-values-form')?.addEventListener('submit', Admin.saveTeamValues);
-
-        // Eliminar porra (zona peligrosa)
         document.getElementById('delete-group-btn')?.addEventListener('click', Admin.deleteCurrentGroup);
+
+        document.getElementById('sync-matches-btn')?.addEventListener('click', async () => {
+            const tournamentId = window.Groups?.currentTournamentId;
+            if (!tournamentId) {
+                window.toast?.warning('Selecciona una porra primero.');
+                return;
+            }
+            window.showLoading?.();
+            try {
+                await Admin.syncMatchesForTournament(tournamentId);
+                await Admin.loadTeamValuesEditor();
+            } finally {
+                window.hideLoading?.();
+            }
+        });
+
+        document.querySelectorAll('#tournament-status-control .segmented-control-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                Admin.setSegmentedControlValue(btn.dataset.value);
+            });
+        });
     }
 };
 
-// Exponer al ámbito global
 window.Admin = Admin;

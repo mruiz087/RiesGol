@@ -95,18 +95,23 @@
                     <p class="text-muted">Crea una porra privada para jugar con tus amigos</p>
                 </header>
 
-                <div class="glass-panel" style="max-width: 500px; margin: 0 auto; padding: 2rem;">
+                <div class="glass-panel" style="max-width: 640px; margin: 0 auto; padding: 2rem;">
                     <form id="create-group-form">
                         <div class="input-group">
                             <label for="group-name">Nombre de la Porra</label>
                             <input type="text" id="group-name" required placeholder="Ej: Cuadrilla, Oficina, Familia">
                         </div>
                         <div class="input-group">
-                            <label for="tournament-select">Torneo</label>
-                            <select id="tournament-select" required>
-                                <option value="">Selecciona un torneo...</option>
-                                <!-- JS inyectará los torneos disponibles -->
-                            </select>
+                            <div class="tournament-picker-header">
+                                <label for="tournament-id">Torneo</label>
+                                <button type="button" class="btn-text" id="refresh-tournaments-btn" title="Actualizar torneos">
+                                    Actualizar torneos
+                                </button>
+                            </div>
+                            <div id="tournament-picker" class="tournament-picker" aria-live="polite">
+                                <p class="text-muted tournament-picker-loading">Sincronizando torneos…</p>
+                            </div>
+                            <input type="hidden" id="tournament-id" required>
                         </div>
                         <button type="submit" class="btn-primary" style="margin-top: 1rem;">Crear Porra</button>
                         <button type="button" class="btn-secondary" id="cancel-create-group" style="margin-top: 0.5rem;">Cancelar</button>
@@ -278,12 +283,13 @@
                     <h3 style="margin-bottom: 1.5rem;">Estado del Torneo</h3>
                     <form id="tournament-status-form">
                         <div class="input-group">
-                            <label for="tournament-status">Estado</label>
-                            <select id="tournament-status">
-                                <option value="draft">Borrador</option>
-                                <option value="active">Activo</option>
-                                <option value="finished">Finalizado</option>
-                            </select>
+                            <span class="input-label">Estado</span>
+                            <div class="segmented-control" id="tournament-status-control" role="radiogroup" aria-label="Estado del torneo">
+                                <button type="button" class="segmented-control-btn" data-value="draft">Borrador</button>
+                                <button type="button" class="segmented-control-btn" data-value="active">Activo</button>
+                                <button type="button" class="segmented-control-btn" data-value="finished">Finalizado</button>
+                            </div>
+                            <input type="hidden" id="tournament-status" value="draft">
                             <small style="color: var(--text-muted);">Estado actual del torneo de esta porra</small>
                         </div>
                         <button type="submit" class="btn-primary" style="margin-top: 1rem;">Actualizar Estado</button>
@@ -301,13 +307,14 @@
                     <h3 style="margin-bottom: 1.5rem;">Premio Especial</h3>
                     <form id="special-prize-form">
                         <div class="input-group">
-                            <label>
+                            <label class="toggle-switch">
                                 <input type="checkbox" id="special-prize-enabled">
-                                Activar premio especial
+                                <span class="toggle-slider" aria-hidden="true"></span>
+                                <span class="toggle-label">Activar premio especial</span>
                             </label>
                         </div>
                         <div class="input-group" id="special-position-group" style="display: none;">
-                            <label for="special-position">Posición especial</label>
+                            <label for="special-position">Posición en clasificación</label>
                             <input type="number" id="special-position" min="1" placeholder="Ej: 13">
                             <small style="color: var(--text-muted);">La posición que recibirá el premio especial</small>
                         </div>
@@ -322,6 +329,11 @@
                         Los equipos se cargan automáticamente desde los partidos del torneo.
                     </p>
                     <form id="team-values-form">
+                        <div class="admin-sync-matches-row">
+                            <button type="button" class="btn-secondary btn-sm" id="sync-matches-btn">
+                                Sincronizar partidos
+                            </button>
+                        </div>
                         <div id="team-values-editor">
                             <p class="text-muted">Cargando equipos…</p>
                         </div>

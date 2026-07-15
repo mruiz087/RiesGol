@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riesgol-v6';
+const CACHE_NAME = 'riesgol-v8';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -15,7 +15,6 @@ const ASSETS_TO_CACHE = [
     './js/groups.js',
     './js/admin.js',
     './js/opciones.js',
-    './js/flags.js',
     'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap'
 ];
 

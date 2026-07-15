@@ -119,6 +119,46 @@ const API = {
         return data;
     },
 
+    // Sincronizar torneos disponibles (WC + EC) desde football-data.org
+    syncAvailableTournaments: async () => {
+        if (!window.supabaseClient) {
+            return { tournaments: [], error: 'Supabase no configurado' };
+        }
+
+        const result = await API.invokeEdgeFunction('sync-tournaments', {});
+        if (result.error) {
+            return { tournaments: [], error: result.error };
+        }
+
+        API.clearCache();
+        const tournaments = await API.getTournaments();
+        return { tournaments, error: null };
+    },
+
+    // Sincronizar partidos de un torneo desde football-data.org (Edge Function)
+    syncMatches: async (tournamentId) => {
+        if (!window.supabaseClient || !tournamentId) {
+            return { error: 'Torneo no especificado' };
+        }
+
+        const result = await API.invokeEdgeFunction('sync-matches', {
+            tournamentId: Number(tournamentId)
+        });
+
+        if (result.error) {
+            return { error: result.error };
+        }
+
+        API.clearCache();
+
+        const data = result.data || {};
+        return {
+            success: true,
+            message: data.message || 'Partidos sincronizados',
+            matchCount: data.matchCount ?? 0
+        };
+    },
+
     // Valores/bombos configurados por porra
     getGroupTeamValues: async (groupId) => {
         if (!window.supabaseClient || !groupId) return [];
