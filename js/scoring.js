@@ -64,9 +64,11 @@ window.loadRanking = async function() {
             .eq('id', groupId)
             .single();
 
-        const specialPrizeEnabled = groupConfig?.special_prize_enabled === true;
-        const specialPosition = specialPrizeEnabled && groupConfig?.special_position > 0
-            ? groupConfig.special_position
+        const specialPrizeEnabled = groupConfig?.special_prize_enabled === true
+            || groupConfig?.special_prize_enabled === 'true'
+            || groupConfig?.special_prize_enabled === 1;
+        const specialPosition = specialPrizeEnabled && Number(groupConfig?.special_position) > 0
+            ? Number(groupConfig.special_position)
             : null;
 
         // ─── Calcular puntos por usuario ───────────────────────────────
@@ -192,14 +194,48 @@ window.loadRanking = async function() {
         const ranking = Object.values(userPoints).sort((a, b) => b.totalPoints - a.totalPoints);
         const paqueteWinner = ranking.filter(u => u.isPaqueteEligible).slice(-1)[0] || null;
 
+        // Posiciones de clasificación (competición): empates comparten puesto y el siguiente salta
+        const displayPositions = [];
+        ranking.forEach((user, index) => {
+            if (index === 0) {
+                displayPositions[index] = 1;
+                return;
+            }
+            const prev = ranking[index - 1];
+            if (round2(user.totalPoints) === round2(prev.totalPoints)) {
+                displayPositions[index] = displayPositions[index - 1];
+            } else {
+                displayPositions[index] = index + 1;
+            }
+        });
+
+        // Premio especial = N-ésimo en la lista ordenada (ordinal), no "puesto denso"
+        // Así posición 3 siempre es ranking[2], aunque haya empates arriba.
+        const specialOrdinalUser = (specialPosition && ranking.length >= specialPosition)
+            ? ranking[specialPosition - 1]
+            : null;
+        const specialPrizePoints = specialOrdinalUser != null
+            ? round2(specialOrdinalUser.totalPoints)
+            : null;
+        const specialWinners = specialPrizePoints != null
+            ? ranking.filter(u => round2(u.totalPoints) === specialPrizePoints)
+            : [];
+
         // ─── Renderizar Podio ───────────────────────────────────────────
         if (ranking[0]) {
             document.getElementById('podium-name-1').textContent = ranking[0].name;
             document.getElementById('podium-pts-1').textContent = `${formatPoints(ranking[0].totalPoints)} pts`;
+        } else {
+            document.getElementById('podium-name-1').textContent = '--';
+            document.getElementById('podium-pts-1').textContent = '0 pts';
         }
+
         if (ranking[1]) {
             document.getElementById('podium-name-2').textContent = ranking[1].name;
             document.getElementById('podium-pts-2').textContent = `${formatPoints(ranking[1].totalPoints)} pts`;
+        } else {
+            document.getElementById('podium-name-2').textContent = '--';
+            document.getElementById('podium-pts-2').textContent = '0 pts';
         }
 
         const pNameLast = document.getElementById('podium-name-last');
@@ -210,38 +246,44 @@ window.loadRanking = async function() {
         }
 
         const podiumStepSpecial = document.getElementById('podium-step-special');
-        const pNameSpecial = document.getElementById('podium-name-13');
-        const pPtsSpecial = document.getElementById('podium-pts-13');
+        const pNameSpecial = document.getElementById('podium-name-special') || document.getElementById('podium-name-13');
+        const pPtsSpecial = document.getElementById('podium-pts-special') || document.getElementById('podium-pts-13');
         const pLabelSpecial = document.getElementById('podium-label-special');
 
-        if (specialPosition && ranking[specialPosition - 1]) {
-            const specialUser = ranking[specialPosition - 1];
+        if (specialOrdinalUser) {
             if (podiumStepSpecial) podiumStepSpecial.style.display = '';
-            pNameSpecial.textContent = `${specialPosition}º: ${specialUser.name}`;
-            pPtsSpecial.textContent = `${formatPoints(specialUser.totalPoints)} pts`;
+            if (pNameSpecial) {
+                pNameSpecial.textContent = specialWinners.length > 1
+                    ? `${specialOrdinalUser.name} +${specialWinners.length - 1}`
+                    : specialOrdinalUser.name;
+            }
+            if (pPtsSpecial) {
+                pPtsSpecial.textContent = `${formatPoints(specialOrdinalUser.totalPoints)} pts`;
+            }
             if (pLabelSpecial) pLabelSpecial.textContent = `${specialPosition}º`;
         } else {
             if (podiumStepSpecial) podiumStepSpecial.style.display = 'none';
-            pNameSpecial.textContent = '--';
-            pPtsSpecial.textContent = '0 pts';
+            if (pNameSpecial) pNameSpecial.textContent = '--';
+            if (pPtsSpecial) pPtsSpecial.textContent = '0 pts';
+            if (pLabelSpecial) pLabelSpecial.textContent = 'Especial';
         }
 
         // ─── Renderizar Tabla General ───────────────────────────────────
         const tbody = document.getElementById('ranking-body');
         tbody.innerHTML = '';
 
+        const specialUserIds = new Set(specialWinners.map(u => u.userId));
+
         ranking.forEach((user, index) => {
-            const pos = index + 1;
-            const isFirst = pos === 1;
-            const isSecond = pos === 2;
-            const isSpecial = specialPosition && pos === specialPosition;
+            const pos = displayPositions[index];
+            const isSpecial = specialUserIds.has(user.userId);
             const isPaqueteWinner = paqueteWinner && user.userId === paqueteWinner.userId;
 
             let badgeHtml = '';
-            if (isFirst) badgeHtml += '<span class="badge gold ml-2">🥇</span>';
-            if (isSecond) badgeHtml += '<span class="badge silver ml-2">🥈</span>';
+            if (index === 0) badgeHtml += '<span class="badge gold ml-2">🥇</span>';
+            if (index === 1) badgeHtml += '<span class="badge silver ml-2">🥈</span>';
             if (isPaqueteWinner && ranking.length > 2) badgeHtml += '<span class="badge bronze ml-2">💀</span>';
-            if (isSpecial) badgeHtml += '<span class="badge spooky ml-2">👻</span>';
+            if (isSpecial) badgeHtml += '<span class="badge spooky ml-2">🎯</span>';
 
             const tr = document.createElement('tr');
             const currentUser = window.getCurrentUser();

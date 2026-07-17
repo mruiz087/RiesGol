@@ -520,19 +520,33 @@ const API = {
     // Actualizar premio especial del grupo
     updateSpecialPrize: async (groupId, enabled, position) => {
         if (!window.supabaseClient) return false;
-        const { error } = await window.supabaseClient
+
+        const payload = {
+            special_prize_enabled: !!enabled,
+            special_position: enabled ? Number(position) : null
+        };
+
+        const { data, error } = await window.supabaseClient
             .from('groups')
-            .update({
-                special_prize_enabled: enabled,
-                special_position: enabled ? position : null
-            })
-            .eq('id', groupId);
-        
+            .update(payload)
+            .eq('id', groupId)
+            .select('id, special_prize_enabled, special_position')
+            .maybeSingle();
+
         if (error) {
-            console.error("Error actualizando premio especial:", error);
-            return false;
+            console.error('Error actualizando premio especial:', error);
+            return { success: false, error: error.message };
         }
-        return true;
+
+        if (!data) {
+            console.error('Premio especial: update sin filas (¿RLS o groupId incorrecto?)', { groupId, payload });
+            return {
+                success: false,
+                error: 'No se pudo guardar. Comprueba que eres admin de esta porra (permisos RLS).'
+            };
+        }
+
+        return { success: true, data };
     },
 
     // Actualizar estado de torneo

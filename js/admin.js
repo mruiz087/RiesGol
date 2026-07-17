@@ -92,10 +92,33 @@ const Admin = {
             .single();
 
         if (group) {
-            document.getElementById('special-prize-enabled').checked = group.special_prize_enabled || false;
+            const enabled = group.special_prize_enabled || false;
+            document.getElementById('special-prize-enabled').checked = enabled;
             document.getElementById('special-position').value = group.special_position || '';
-            document.getElementById('special-position-group').style.display = group.special_prize_enabled ? 'block' : 'none';
+            document.getElementById('special-position-group').style.display = enabled ? 'block' : 'none';
+            await Admin.updateSpecialPositionHint();
         }
+    },
+
+    updateSpecialPositionHint: async () => {
+        const hint = document.getElementById('special-position-hint');
+        const input = document.getElementById('special-position');
+        if (!hint) return;
+
+        const groupId = window.Groups?.currentGroupId;
+        let memberCount = 0;
+        if (groupId && window.apiClient?.getGroupMembers) {
+            const members = await window.apiClient.getGroupMembers(groupId);
+            memberCount = members?.length || 0;
+        }
+
+        if (input && memberCount > 0) {
+            input.max = String(memberCount);
+        }
+
+        hint.textContent = memberCount > 0
+            ? `Hay ${memberCount} jugador${memberCount !== 1 ? 'es' : ''} en la porra. La posición debe estar entre 1 y ${memberCount}.`
+            : 'Debe existir al menos esa cantidad de jugadores en la porra.';
     },
 
     setSegmentedControlValue: (value) => {
@@ -133,18 +156,47 @@ const Admin = {
         if (!groupId) return;
 
         const enabled = document.getElementById('special-prize-enabled').checked;
-        const position = enabled ? parseInt(document.getElementById('special-position').value) : null;
+        const positionRaw = document.getElementById('special-position').value;
+        const position = enabled ? parseInt(positionRaw, 10) : null;
 
-        if (enabled && (!position || position < 1)) {
-            window.toast?.warning('Por favor ingresa una posición válida');
-            return;
+        if (enabled) {
+            if (!Number.isFinite(position) || position < 1) {
+                window.toast?.warning('Ingresa una posición válida (mínimo 1)');
+                return;
+            }
+
+            const members = await window.apiClient.getGroupMembers(groupId);
+            const memberCount = members?.length || 0;
+
+            if (memberCount === 0) {
+                window.toast?.warning('No hay miembros en la porra todavía');
+                return;
+            }
+
+            if (position > memberCount) {
+                window.toast?.warning(
+                    `Solo hay ${memberCount} jugador${memberCount !== 1 ? 'es' : ''}. Elige una posición entre 1 y ${memberCount}.`
+                );
+                return;
+            }
+
+            if (position === 1 || position === 2) {
+                const ok = confirm(
+                    `La posición ${position}º ya aparece en el podio principal (1º/2º). ¿Quieres usarla también como premio especial?`
+                );
+                if (!ok) return;
+            }
         }
 
-        const success = await window.apiClient.updateSpecialPrize(groupId, enabled, position);
-        if (success) {
-            window.toast?.success('Configuración guardada');
+        const result = await window.apiClient.updateSpecialPrize(groupId, enabled, position);
+        if (result?.success || result === true) {
+            if (enabled) {
+                window.toast?.success(`Premio especial: posición ${position}. Ábrelo en Clasificación para verlo en el podio.`);
+            } else {
+                window.toast?.success('Premio especial desactivado');
+            }
         } else {
-            window.toast?.error('Error al guardar configuración');
+            window.toast?.error(result?.error || 'Error al guardar configuración');
         }
     },
 
@@ -476,7 +528,9 @@ const Admin = {
         const currentUser = window.getCurrentUser();
         const adminLink = document.getElementById('admin-link');
         
-        if (!groupId || !currentUser || !adminLink) {
+        if (!adminLink) return;
+
+        if (!groupId || !currentUser) {
             adminLink.style.display = 'none';
             return;
         }
@@ -487,8 +541,11 @@ const Admin = {
 
     // Inicializar event listeners
     init: () => {
-        document.getElementById('special-prize-enabled')?.addEventListener('change', (e) => {
+        document.getElementById('special-prize-enabled')?.addEventListener('change', async (e) => {
             document.getElementById('special-position-group').style.display = e.target.checked ? 'block' : 'none';
+            if (e.target.checked) {
+                await Admin.updateSpecialPositionHint();
+            }
         });
 
         document.getElementById('special-prize-form')?.addEventListener('submit', Admin.saveSpecialPrizeConfig);

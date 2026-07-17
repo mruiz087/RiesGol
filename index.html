@@ -163,10 +163,10 @@
                         <div class="podium-bar gold-bg">1º</div>
                     </div>
                     <!-- Posición especial (configurable por admin) -->
-                    <div class="podium-step step-13" id="podium-step-special">
+                    <div class="podium-step step-special" id="podium-step-special" style="display: none;">
                         <div class="podium-avatar">🎯</div>
-                        <div class="podium-name" id="podium-name-13">--</div>
-                        <div class="podium-pts" id="podium-pts-13">0 pts</div>
+                        <div class="podium-name" id="podium-name-special">--</div>
+                        <div class="podium-pts" id="podium-pts-special">0 pts</div>
                         <div class="podium-bar special-bg" id="podium-label-special">Especial</div>
                     </div>
                     <!-- Posición Último (más pequeño) -->
@@ -176,9 +176,10 @@
                     </div>
                 </div>
 
-                <!-- TABLA 1: Puntos por aciertos 1X2 -->
+                <!-- TABLA 1: Clasificación general -->
                 <div class="ranking-container">
-                    <h3 class="ranking-section-title">🏆 Premio por Posición (Aciertos 1X2)</h3>
+                    <h3 class="ranking-section-title">🏆 Clasificación General</h3>
+                    <p class="text-muted ranking-section-subtitle">Apuestas + Pichichi (total)</p>
                     <table class="premium-table">
                         <thead>
                             <tr>
@@ -317,9 +318,13 @@
                     <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
 
                     <h3 style="margin-bottom: 1.5rem;">Premio Especial</h3>
+                    <p class="text-muted" style="margin-bottom: 1rem;">
+                        Premio a quien ocupe la posición N en la clasificación general (apuestas + Pichichi).
+                        No añade puntos: solo destaca en el podio y en la tabla.
+                    </p>
                     <form id="special-prize-form">
                         <div class="input-group">
-                            <label class="toggle-switch">
+                            <label class="toggle-switch" for="special-prize-enabled">
                                 <input type="checkbox" id="special-prize-enabled">
                                 <span class="toggle-slider" aria-hidden="true"></span>
                                 <span class="toggle-label">Activar premio especial</span>
@@ -327,8 +332,10 @@
                         </div>
                         <div class="input-group" id="special-position-group" style="display: none;">
                             <label for="special-position">Posición en clasificación</label>
-                            <input type="number" id="special-position" min="1" placeholder="Ej: 13">
-                            <small style="color: var(--text-muted);">La posición que recibirá el premio especial</small>
+                            <input type="number" id="special-position" min="1" placeholder="Ej: 3">
+                            <small id="special-position-hint" style="color: var(--text-muted);">
+                                Debe existir al menos esa cantidad de jugadores en la porra.
+                            </small>
                         </div>
                         <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar Configuración</button>
                     </form>
