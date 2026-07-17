@@ -135,6 +135,8 @@ window.navigateTo = function(viewId) {
             window.loadRanking();
         } else if (viewId === 'matches-view' && window.loadMatches) {
             window.loadMatches();
+        } else if (viewId === 'results-view' && window.loadResults) {
+            window.loadResults();
         } else if (viewId === 'pichichi-view' && window.loadPichichiData) {
             window.loadPichichiData();
         } else if (viewId === 'stats-view' && window.loadStats) {

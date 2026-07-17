@@ -367,9 +367,11 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
         <div class="match-row">
             <div class="match-team match-team-home">
                 <span class="team-name">${localTeamName}</span>
+                ${typeof window.teamFlagHtml === 'function' ? window.teamFlagHtml(match.equipo_local_nombre) : ''}
             </div>
             ${scoreHtml}
             <div class="match-team match-team-away">
+                ${typeof window.teamFlagHtml === 'function' ? window.teamFlagHtml(match.equipo_visitante_nombre) : ''}
                 <span class="team-name">${awayTeamName}</span>
             </div>
         </div>
