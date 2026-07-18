@@ -296,7 +296,7 @@ window.loadRanking = async function() {
             let badgeHtml = '';
             if (index === 0) badgeHtml += '<span class="badge gold ml-2">🥇</span>';
             if (index === 1) badgeHtml += '<span class="badge silver ml-2">🥈</span>';
-            if (isPaqueteWinner && ranking.length > 2) badgeHtml += '<span class="badge bronze ml-2">💀</span>';
+            if (isPaqueteWinner && ranking.length > 2) badgeHtml += '<span class="badge bronze ml-2">📦</span>';
             if (isSpecial) badgeHtml += '<span class="badge spooky ml-2">🎯</span>';
 
             const tr = document.createElement('tr');
