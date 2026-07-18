@@ -166,7 +166,8 @@ function calcSelectionMatchPoints(match, selection, maxFifaPoints, teamsFifaMap,
     const teamFifa = getSelectionFifaPoints(selection, teamsFifaMap);
     const goalFactor = maxFifaPoints / teamFifa;
     const multiplier = getPhaseMultiplier(match.fase);
-    const points = round2(goals * multiplier * goalFactor);
+    // Precisión completa en el cálculo; redondeo solo al mostrar
+    const points = goals * multiplier * goalFactor;
 
     return {
         points,
@@ -193,13 +194,13 @@ function calcUserPichichi(selections, matches, maxFifaPoints, teamsFifaMap, team
         selections.forEach(selection => {
             const result = calcSelectionMatchPoints(match, selection, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
             if (result.played) {
-                matchTotal = round2(matchTotal + result.points);
+                matchTotal += result.points;
                 breakdown.push(result);
             }
         });
 
         if (breakdown.length > 0) {
-            total = round2(total + matchTotal);
+            total += matchTotal;
             perMatch.push({ matchId: match.id, points: matchTotal, breakdown });
         }
     });
@@ -218,12 +219,12 @@ function calcMatchPichichiForUser(match, selections, maxFifaPoints, teamsFifaMap
     selections.forEach(selection => {
         const result = calcSelectionMatchPoints(match, selection, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
         if (result.played) {
-            total = round2(total + result.points);
+            total += result.points;
             breakdown.push(result);
         }
     });
 
-    return { total: round2(total), breakdown, hasFavorite: breakdown.length > 0 };
+    return { total, breakdown, hasFavorite: breakdown.length > 0 };
 }
 
 async function loadTeamAliases() {

@@ -257,7 +257,7 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
             `${b.teamName}: ${b.goals} gol${b.goals !== 1 ? 'es' : ''} × fase x${b.multiplier} × valor ${b.goalFactor.toFixed(2)}`
         );
 
-        const totalPoints = round2(betPointsEarned + pichichiPointsEarned);
+        const totalPoints = betPointsEarned + pichichiPointsEarned;
 
         let breakdownHtml = '';
         if (userBet) {

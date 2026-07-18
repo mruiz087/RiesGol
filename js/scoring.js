@@ -195,14 +195,17 @@ window.loadRanking = async function() {
                     selections, matches, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap
                 );
                 if (userPoints[userId]) {
-                    userPoints[userId].pichichiPoints = round2(total);
+                    // Precisión completa; formatPoints redondea a 2 decimales solo al pintar
+                    userPoints[userId].pichichiPoints = Number(total) || 0;
                 }
             });
         }
 
         // ─── Calcular total y ordenar ───────────────────────────────────
         Object.keys(userPoints).forEach(userId => {
-            userPoints[userId].totalPoints = round2(userPoints[userId].betPoints + userPoints[userId].pichichiPoints);
+            userPoints[userId].totalPoints =
+                (Number(userPoints[userId].betPoints) || 0) +
+                (Number(userPoints[userId].pichichiPoints) || 0);
         });
 
         const ranking = Object.values(userPoints).sort((a, b) => b.totalPoints - a.totalPoints);
