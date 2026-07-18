@@ -121,7 +121,6 @@ const PICHICHI_GATED_VIEWS = new Set([
     'dashboard-view',
     'matches-view',
     'results-view',
-    'stats-view',
     'group-admin-view',
 ]);
 
@@ -162,13 +161,13 @@ window.navigateTo = async function(viewId) {
             window.loadResults();
         } else if (resolvedViewId === 'pichichi-view' && window.loadPichichiData) {
             window.loadPichichiData();
-        } else if (resolvedViewId === 'stats-view' && window.loadStats) {
-            window.loadStats();
         } else if (resolvedViewId === 'group-admin-view' && window.Admin) {
             window.Admin.loadGroupMembers();
             window.Admin.loadSpecialPrizeConfig();
             window.Admin.loadTournamentStatus();
             window.Admin.loadTeamValuesEditor();
+        } else if (resolvedViewId === 'opciones-view' && window.loadOpciones) {
+            window.loadOpciones();
         }
 
         if (resolvedViewId === 'my-groups-view' && window.Groups) {
@@ -198,10 +197,12 @@ function updateNavVisibility() {
     const noGroupOnlyItems = document.querySelectorAll('.no-group-only');
 
     groupOnlyItems.forEach(item => {
-        item.style.display = hasGroup ? 'block' : 'none';
+        // Admin lo gestiona updateAdminLinkVisibility (evitar display:block que desalineaba)
+        if (item.id === 'admin-nav-item' || item.querySelector?.('#admin-link')) return;
+        item.style.display = hasGroup ? '' : 'none';
     });
     noGroupOnlyItems.forEach(item => {
-        item.style.display = hasGroup ? 'none' : 'block';
+        item.style.display = hasGroup ? 'none' : '';
     });
 }
 

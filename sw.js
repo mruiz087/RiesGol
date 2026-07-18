@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riesgol-v17';
+const CACHE_NAME = 'riesgol-v25';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -13,7 +13,6 @@ const ASSETS_TO_CACHE = [
     './js/results.js',
     './js/scoring.js',
     './js/pichichi.js',
-    './js/stats.js',
     './js/groups.js',
     './js/admin.js',
     './js/opciones.js',
@@ -46,13 +45,12 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-    const cacheWhitelist = [CACHE_NAME];
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
-                cacheNames.map((cacheName) => {
-                    if (cacheWhitelist.indexOf(cacheName) === -1) {
-                        return caches.delete(cacheName);
+                cacheNames.map((cache) => {
+                    if (cache !== CACHE_NAME) {
+                        return caches.delete(cache);
                     }
                 })
             );

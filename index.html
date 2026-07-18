@@ -32,8 +32,7 @@
                 <li class="group-only" style="display: none;"><a href="#" data-target="matches-view">Partidos & Apuestas</a></li>
                 <li class="group-only" style="display: none;"><a href="#" data-target="results-view">Resultados</a></li>
                 <li class="group-only" style="display: none;"><a href="#" data-target="pichichi-view">Pichichi</a></li>
-                <li class="group-only" style="display: none;"><a href="#" data-target="stats-view">Estadísticas</a></li>
-                <li class="group-only" style="display: none;"><a href="#" data-target="group-admin-view" id="admin-link">Admin</a></li>
+                <li class="group-only" id="admin-nav-item" style="display: none;"><a href="#" data-target="group-admin-view" id="admin-link">Admin</a></li>
                 <li class="nav-always"><a href="#" data-target="opciones-view">Opciones</a></li>
             </ul>
             <div class="mobile-menu-btn">☰</div>
@@ -229,10 +228,10 @@
             <section id="results-view" class="view hidden">
                 <header class="view-header">
                     <h2>Resultados</h2>
-                    <p class="text-muted">Partidos finalizados por fase</p>
+                    <p class="text-muted">Resultados y apuestas de la porra</p>
                 </header>
                 <div id="results-container">
-                    <!-- JS inyectará tablas de resultados por fase -->
+                    <!-- JS inyectará filtro, tablas y stats por fase -->
                 </div>
             </section>
 
@@ -252,18 +251,6 @@
                 </div>
             </section>
 
-            <!-- Statistics View -->
-            <section id="stats-view" class="view hidden">
-                <header class="view-header">
-                    <h2>Estadísticas</h2>
-                    <p class="text-muted">Distribución de apuestas por partido en la porra</p>
-                </header>
-                
-                <div class="stats-container" id="stats-container">
-                    <!-- JS Inyectará estadísticas por partido aquí -->
-                </div>
-            </section>
-
             <!-- Options View -->
             <section id="opciones-view" class="view hidden">
                 <header class="view-header">
@@ -272,13 +259,14 @@
                 </header>
                 
                 <div class="glass-panel" style="max-width: 500px; margin: 0 auto; padding: 2rem;">
-                    <h3 style="margin-bottom: 1.5rem;">Cambiar Nombre de Usuario</h3>
+                    <h3 style="margin-bottom: 1.5rem;">Nombre de Usuario</h3>
                     <form id="change-name-form">
                         <div class="input-group">
-                            <label for="new-name">Nuevo Nombre / Apodo</label>
-                            <input type="text" id="new-name" required placeholder="Tu nuevo nombre en la porra">
+                            <label for="new-name">Nombre / Apodo</label>
+                            <input type="text" id="new-name" class="name-field" required readonly placeholder="Tu nombre en la porra" autocomplete="nickname">
+                            <small class="name-field-hint">Pulsa el nombre para editarlo</small>
                         </div>
-                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Actualizar Nombre</button>
+                        <button type="submit" class="btn-primary" id="save-name-btn" style="margin-top: 1rem;" disabled>Guardar Nombre</button>
                     </form>
 
                     <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
@@ -392,7 +380,6 @@
     <script src="./js/results.js" defer></script>
     <script src="./js/scoring.js" defer></script>
     <script src="./js/pichichi.js" defer></script>
-    <script src="./js/stats.js" defer></script>
     <script src="./js/opciones.js" defer></script>
 </body>
 </html>

@@ -529,14 +529,21 @@ const Admin = {
         const adminLink = document.getElementById('admin-link');
         
         if (!adminLink) return;
+        const adminItem = document.getElementById('admin-nav-item') || adminLink.closest('li');
 
         if (!groupId || !currentUser) {
-            adminLink.style.display = 'none';
+            if (adminItem) adminItem.style.display = 'none';
+            else adminLink.style.display = 'none';
             return;
         }
 
         const isAdmin = await Admin.isAdmin(groupId, currentUser.id);
-        adminLink.style.display = isAdmin ? 'block' : 'none';
+        if (adminItem) {
+            adminItem.style.display = isAdmin ? '' : 'none';
+            adminLink.style.display = '';
+        } else {
+            adminLink.style.display = isAdmin ? '' : 'none';
+        }
     },
 
     // Inicializar event listeners
