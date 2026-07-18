@@ -117,45 +117,67 @@ function initApp() {
     }
 }
 
+const PICHICHI_GATED_VIEWS = new Set([
+    'dashboard-view',
+    'matches-view',
+    'results-view',
+    'stats-view',
+    'group-admin-view',
+]);
+
 // Función para cambiar de vista (SPA)
-window.navigateTo = function(viewId) {
+window.navigateTo = async function(viewId) {
+    let resolvedViewId = viewId;
+
+    if (
+        PICHICHI_GATED_VIEWS.has(viewId)
+        && window.Groups?.currentGroupId
+        && typeof window.Groups.userHasPichichi === 'function'
+    ) {
+        const hasPichichi = await window.Groups.userHasPichichi();
+        if (!hasPichichi) {
+            resolvedViewId = 'pichichi-view';
+            if (viewId !== 'pichichi-view') {
+                window.toast?.warning('Primero debes elegir tus equipos pichichi.');
+            }
+        }
+    }
+
     const views = document.querySelectorAll('.view');
     views.forEach(view => {
         view.classList.remove('active');
         view.classList.add('hidden');
     });
 
-    const targetView = document.getElementById(viewId);
+    const targetView = document.getElementById(resolvedViewId);
     if (targetView) {
         targetView.classList.remove('hidden');
         targetView.classList.add('active');
-        
-        // Llamar a funciones de carga de datos según la vista
-        if (viewId === 'dashboard-view' && window.loadRanking) {
+
+        if (resolvedViewId === 'dashboard-view' && window.loadRanking) {
             window.loadRanking();
-        } else if (viewId === 'matches-view' && window.loadMatches) {
+        } else if (resolvedViewId === 'matches-view' && window.loadMatches) {
             window.loadMatches();
-        } else if (viewId === 'results-view' && window.loadResults) {
+        } else if (resolvedViewId === 'results-view' && window.loadResults) {
             window.loadResults();
-        } else if (viewId === 'pichichi-view' && window.loadPichichiData) {
+        } else if (resolvedViewId === 'pichichi-view' && window.loadPichichiData) {
             window.loadPichichiData();
-        } else if (viewId === 'stats-view' && window.loadStats) {
+        } else if (resolvedViewId === 'stats-view' && window.loadStats) {
             window.loadStats();
-        } else if (viewId === 'group-admin-view' && window.Admin) {
+        } else if (resolvedViewId === 'group-admin-view' && window.Admin) {
             window.Admin.loadGroupMembers();
             window.Admin.loadSpecialPrizeConfig();
             window.Admin.loadTournamentStatus();
             window.Admin.loadTeamValuesEditor();
         }
-        
-        if (viewId === 'my-groups-view' && window.Groups) {
+
+        if (resolvedViewId === 'my-groups-view' && window.Groups) {
             window.Groups.loadUserGroups();
         }
-        
+
         updateNavVisibility();
-        setActiveNavLink(viewId);
-        
-        // Actualizar visibilidad del enlace de admin
+        setActiveNavLink(resolvedViewId);
+
         if (window.Admin) {
             window.Admin.updateAdminLinkVisibility();
         }

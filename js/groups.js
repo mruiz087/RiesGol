@@ -6,6 +6,41 @@ const Groups = {
     currentTournamentId: null,
     selectedTournamentId: null,
 
+    /** true / false / null (desconocido). Se invalida al cambiar de porra. */
+    currentUserHasPichichi: null,
+
+    userHasPichichi: async (userId = null, groupId = null) => {
+        const uid = userId || window.currentUser?.id || window.getCurrentUser?.()?.id;
+        const gid = groupId ?? Groups.currentGroupId;
+        if (!uid || !gid || !window.supabaseClient) return false;
+
+        if (
+            Groups.currentUserHasPichichi != null
+            && String(gid) === String(Groups.currentGroupId)
+            && String(uid) === String(window.currentUser?.id || window.getCurrentUser?.()?.id)
+        ) {
+            return Groups.currentUserHasPichichi;
+        }
+
+        const { data, error } = await window.supabaseClient
+            .from('favorite_selections')
+            .select('id')
+            .eq('user_id', uid)
+            .eq('group_id', gid)
+            .limit(1);
+
+        if (error) {
+            console.error('Error comprobando pichichi:', error);
+            return false;
+        }
+
+        const has = !!(data && data.length > 0);
+        if (String(gid) === String(Groups.currentGroupId)) {
+            Groups.currentUserHasPichichi = has;
+        }
+        return has;
+    },
+
     getTournamentStatusLabel: (estado) => {
         if (estado === 'finished') return { text: 'Finalizada', className: 'finished' };
         if (estado === 'draft') return { text: 'Borrador', className: 'draft' };
@@ -180,28 +215,28 @@ const Groups = {
         });
     },
 
-    // Seleccionar una porra y navegar al dashboard
-    selectGroup: (groupId, tournamentId) => {
+    // Seleccionar una porra: pichichi primero si aún no está guardado
+    selectGroup: async (groupId, tournamentId) => {
         Groups.currentGroupId = groupId;
         Groups.currentTournamentId = tournamentId;
-        
-        // Guardar en localStorage para persistencia
+        Groups.currentUserHasPichichi = null;
+
         localStorage.setItem('currentGroupId', groupId);
         localStorage.setItem('currentTournamentId', tournamentId);
-        
-        // Actualizar visibilidad del enlace de admin
+
         if (window.Admin) {
             window.Admin.updateAdminLinkVisibility();
         }
-        
-        // Navegar al dashboard (entrar en la porra)
-        window.navigateTo('dashboard-view');
+
+        const hasPichichi = await Groups.userHasPichichi();
+        window.navigateTo(hasPichichi ? 'dashboard-view' : 'pichichi-view');
     },
 
     // Volver al listado de porras (salir del contexto de porra activa)
     returnToList: () => {
         Groups.currentGroupId = null;
         Groups.currentTournamentId = null;
+        Groups.currentUserHasPichichi = null;
         localStorage.removeItem('currentGroupId');
         localStorage.removeItem('currentTournamentId');
 

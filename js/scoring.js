@@ -71,12 +71,26 @@ window.loadRanking = async function() {
             ? Number(groupConfig.special_position)
             : null;
 
+        // Solo cuentan quienes ya guardaron pichichi (favorite_selections)
+        const usersWithPichichi = new Set(
+            (favoriteSelections || []).map(s => s.user_id)
+        );
+        const eligibleMembers = members.filter(m => usersWithPichichi.has(m.user_id));
+
+        if (eligibleMembers.length === 0) {
+            document.getElementById('ranking-body').innerHTML =
+                '<tr><td colspan="3" class="text-center">Nadie ha elegido pichichi todavía.</td></tr>';
+            document.getElementById('pichichi-ranking-body').innerHTML =
+                '<tr><td colspan="3" class="text-center">Nadie ha elegido pichichi todavía.</td></tr>';
+            return;
+        }
+
         // ─── Calcular puntos por usuario ───────────────────────────────
         const userPoints = {};
         const userPichichiPoints = {};
 
-        // Inicializar usuarios
-        members.forEach(member => {
+        // Inicializar solo usuarios con pichichi
+        eligibleMembers.forEach(member => {
             userPoints[member.user_id] = {
                 userId: member.user_id,
                 name: member.users?.name || 'Anónimo',

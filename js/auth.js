@@ -137,6 +137,7 @@ async function handleLogout(e) {
         if (window.Groups) {
             window.Groups.currentGroupId = null;
             window.Groups.currentTournamentId = null;
+            window.Groups.currentUserHasPichichi = null;
             localStorage.removeItem('currentGroupId');
             localStorage.removeItem('currentTournamentId');
         }

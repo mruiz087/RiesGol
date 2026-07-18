@@ -47,18 +47,6 @@
         return fase !== 'THIRD_PLACE' && fase !== 'THIRD_PLACE_MATCH';
     }
 
-    function getMatchOutcome(match) {
-        const gl = Number(match.goles_local);
-        const gv = Number(match.goles_visitante);
-        if (gl > gv) {
-            return { code: '1', label: 'Local (1)', className: 'result-home' };
-        }
-        if (gv > gl) {
-            return { code: '2', label: 'Visitante (2)', className: 'result-away' };
-        }
-        return { code: 'X', label: 'Empate (X)', className: 'result-draw' };
-    }
-
     function formatDate(iso) {
         try {
             return new Date(iso).toLocaleString('es-ES', {
@@ -91,21 +79,17 @@
 
     function renderPhaseTable(matches) {
         const rows = matches.map(match => {
-            const outcome = getMatchOutcome(match);
             const gl = match.goles_local ?? '—';
             const gv = match.goles_visitante ?? '—';
             return `
                 <tr>
                     <td class="results-date">${formatDate(match.fecha_inicio)}</td>
-                    <td class="results-match-line" colspan="3">
+                    <td class="results-match-line">
                         <div class="results-line">
                             ${teamCell(match.equipo_local_nombre, 'home')}
                             <span class="results-score">${gl} – ${gv}</span>
                             ${teamCell(match.equipo_visitante_nombre, 'away')}
                         </div>
-                    </td>
-                    <td>
-                        <span class="results-outcome ${outcome.className}">${outcome.label}</span>
                     </td>
                 </tr>
             `;
@@ -116,9 +100,8 @@
                 <table class="results-table">
                     <thead>
                         <tr>
-                            <th>Fecha</th>
-                            <th colspan="3">Partido</th>
-                            <th>Resultado</th>
+                            <th class="results-date-header">Fecha</th>
+                            <th>Partido</th>
                         </tr>
                     </thead>
                     <tbody>${rows}</tbody>
