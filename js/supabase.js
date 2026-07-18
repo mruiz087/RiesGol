@@ -6,6 +6,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Inicializar cliente de Supabase solo si existe la librería
 let supabaseClient = null;
+let supabasePublicClient = null;
 
 if (typeof supabase !== 'undefined') {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -13,10 +14,13 @@ if (typeof supabase !== 'undefined') {
             schema: 'porra'
         }
     });
+    // Cliente en schema public: RPCs como get_group_bets
+    supabasePublicClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log("Supabase inicializado correctamente con esquema 'porra'.");
 } else {
     console.warn("Librería de Supabase no cargada.");
 }
 
-// Exportamos la instancia (en Vanilla JS lo añadimos al objeto global para usarlo en otros archivos)
 window.supabaseClient = supabaseClient;
+window.supabasePublicClient = supabasePublicClient;
+window.SUPABASE_URL = SUPABASE_URL;

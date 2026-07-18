@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riesgol-v26';
+const CACHE_NAME = 'riesgol-v34';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -17,44 +17,59 @@ const ASSETS_TO_CACHE = [
     './js/groups.js',
     './js/admin.js',
     './js/opciones.js',
-    'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap'
 ];
 
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                return cache.addAll(ASSETS_TO_CACHE);
-            })
+function isAppShellRequest(request) {
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) return false;
+    const path = url.pathname;
+    return (
+        path.endsWith('/') ||
+        path.endsWith('.html') ||
+        path.endsWith('.js') ||
+        path.endsWith('.css')
     );
-});
+}
 
-self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request)
-            .then((response) => {
-                // Cache hit - return response
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request).catch(() => {
-                    // Si no hay red y no está en caché, no podemos hacer mucho más,
-                    // pero para la DB (Supabase) manejaremos errores en el cliente.
-                });
-            })
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
     );
 });
 
 self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cache) => {
-                    if (cache !== CACHE_NAME) {
-                        return caches.delete(cache);
-                    }
+        caches.keys().then((cacheNames) =>
+            Promise.all(
+                cacheNames
+                    .filter((name) => name !== CACHE_NAME)
+                    .map((name) => caches.delete(name))
+            )
+        ).then(() => self.clients.claim())
+    );
+});
+
+// HTML/JS/CSS: red primero (evita quedarse con results.js / scoring.js viejos).
+// Resto: cache-first para offline básico.
+self.addEventListener('fetch', (event) => {
+    const { request } = event;
+    if (request.method !== 'GET') return;
+
+    if (isAppShellRequest(request)) {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    const copy = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+                    return response;
                 })
-            );
-        })
+                .catch(() => caches.match(request).then((cached) => cached || caches.match('./index.html')))
+        );
+        return;
+    }
+
+    event.respondWith(
+        caches.match(request).then((cached) => cached || fetch(request))
     );
 });

@@ -17,6 +17,8 @@
     let openMatchIds = new Set();
     let cachedBets = [];
     let cachedMembers = [];
+    let cachedPhaseOrder = [];
+    let cachedPhaseGroups = {};
     let interactionsBound = false;
 
     function matchKey(id) {
@@ -89,7 +91,7 @@
     }
 
     function betUserName(bet) {
-        return bet?.users?.name || 'Anónimo';
+        return bet?.users?.name || bet?._userName || 'Anónimo';
     }
 
     function renderVotersList(names) {
@@ -119,9 +121,10 @@
         const names2 = [];
         matchBets.forEach(bet => {
             const name = betUserName(bet);
-            if (bet.prediccion === '1') names1.push(name);
-            else if (bet.prediccion === 'X') namesX.push(name);
-            else if (bet.prediccion === '2') names2.push(name);
+            const pred = String(bet.prediccion || '').trim().toUpperCase();
+            if (pred === '1') names1.push(name);
+            else if (pred === 'X') namesX.push(name);
+            else if (pred === '2') names2.push(name);
         });
         return {
             names1,
@@ -138,7 +141,8 @@
         const bet = cachedBets.find(
             b => matchKey(b.match_id) === matchKey(matchId) && String(b.user_id) === String(userId)
         );
-        return bet?.prediccion || null;
+        const pred = bet?.prediccion != null ? String(bet.prediccion).trim().toUpperCase() : null;
+        return pred || null;
     }
 
     function renderGroupStatsPanel(matchId) {
@@ -320,14 +324,8 @@
             if (fase && sec.open) openPhases.add(fase);
         });
 
-        let state = { phaseOrder: [], phaseGroups: {} };
-        try {
-            state = JSON.parse(container.dataset.resultsState || '{}');
-        } catch (err) {
-            console.error('Estado de resultados corrupto', err);
-        }
-        const phaseOrder = state.phaseOrder || [];
-        const phaseGroups = state.phaseGroups || {};
+        const phaseOrder = cachedPhaseOrder || [];
+        const phaseGroups = cachedPhaseGroups || {};
 
         let body = renderFilterBar();
         phaseOrder.forEach(fase => {
@@ -353,7 +351,9 @@
     }
 
     function buildResultsUi(container, phaseOrder, phaseGroups) {
-        container.dataset.resultsState = JSON.stringify({ phaseOrder, phaseGroups });
+        cachedPhaseOrder = phaseOrder;
+        cachedPhaseGroups = phaseGroups;
+
         let html = renderFilterBar();
         const defaultOpenPhase = phaseOrder[phaseOrder.length - 1];
 
@@ -377,6 +377,60 @@
         ensureInteractions(container);
     }
 
+    async function loadGroupBets(groupId) {
+        if (window.apiClient?.getGroupBets) {
+            const rows = await window.apiClient.getGroupBets(groupId);
+            console.log('[Resultados] bets via getGroupBets:', rows.length);
+            return rows;
+        }
+        const { data, error } = await window.supabaseClient
+            .from('bets')
+            .select('*')
+            .eq('group_id', groupId);
+        if (error) {
+            console.warn('[Resultados] Error bets:', error);
+            return [];
+        }
+        return data || [];
+    }
+
+    async function loadMemberNames(groupId) {
+        const gidNum = Number(groupId);
+        const gid = Number.isFinite(gidNum) ? gidNum : groupId;
+
+        const { data: members, error: membersError } = await window.supabaseClient
+            .from('group_members')
+            .select('user_id')
+            .eq('group_id', gid);
+
+        if (membersError) throw membersError;
+
+        const userIds = [...new Set((members || []).map(m => m.user_id).filter(Boolean))];
+        const nameByUserId = {};
+
+        if (userIds.length) {
+            const { data: users, error: usersError } = await window.supabaseClient
+                .from('users')
+                .select('id, name')
+                .in('id', userIds);
+
+            if (usersError) {
+                console.warn('[Resultados] Error cargando nombres:', usersError);
+            } else {
+                (users || []).forEach(u => {
+                    nameByUserId[String(u.id)] = u.name || 'Anónimo';
+                });
+            }
+        }
+
+        return (members || [])
+            .map(m => ({
+                user_id: m.user_id,
+                name: nameByUserId[String(m.user_id)] || 'Anónimo',
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    }
+
     window.loadResults = async function () {
         const container = document.getElementById('results-container');
         if (!container) return;
@@ -386,6 +440,8 @@
         openMatchIds = new Set();
         cachedBets = [];
         cachedMembers = [];
+        cachedPhaseOrder = [];
+        cachedPhaseGroups = {};
 
         window.showLoading();
         try {
@@ -413,27 +469,25 @@
                 return;
             }
 
-            const [membersRes, betsRes] = await Promise.all([
-                window.supabaseClient
-                    .from('group_members')
-                    .select('user_id, users(name)')
-                    .eq('group_id', groupId),
-                window.supabaseClient
-                    .from('bets')
-                    .select('match_id, prediccion, user_id, users(name)')
-                    .eq('group_id', groupId),
+            const [members, rawBets] = await Promise.all([
+                loadMemberNames(groupId),
+                loadGroupBets(groupId),
             ]);
 
-            if (membersRes.error) throw membersRes.error;
-            if (betsRes.error) throw betsRes.error;
+            cachedMembers = members;
+            const nameByUserId = {};
+            cachedMembers.forEach(m => {
+                nameByUserId[String(m.user_id)] = m.name;
+            });
 
-            cachedBets = betsRes.data || [];
-            cachedMembers = (membersRes.data || [])
-                .map(m => ({
-                    user_id: m.user_id,
-                    name: m.users?.name || 'Anónimo',
-                }))
-                .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+            cachedBets = (rawBets || []).map(b => ({
+                ...b,
+                prediccion: String(b.prediccion || '').trim().toUpperCase(),
+                users: { name: nameByUserId[String(b.user_id)] || 'Anónimo' },
+                _userName: nameByUserId[String(b.user_id)] || 'Anónimo',
+            }));
+
+            console.log('[Resultados] groupId=', groupId, 'bets=', cachedBets.length, 'matchIds=', cachedBets.map(b => b.match_id));
 
             const phaseOrder = [];
             const phaseGroups = {};

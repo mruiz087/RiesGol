@@ -110,6 +110,7 @@ window.loadMatches = async function() {
         let userBets = [];
         let allGroupBets = [];
         let userPichichiSelections = [];
+        let participantIds = [];
         let maxFifaPoints = 1000;
         let teamsFifaMap = {};
         let teamsNameToId = {};
@@ -138,19 +139,30 @@ window.loadMatches = async function() {
             if (betsError) console.error('Error cargando apuestas:', betsError);
             if (data) userBets = data;
 
-            const { data: groupBets } = await window.supabaseClient
-                .from('bets')
-                .select('user_id, match_id, prediccion')
-                .eq('group_id', groupId);
-            if (groupBets) allGroupBets = groupBets;
+            allGroupBets = await window.apiClient.getGroupBets(groupId);
 
-            const { data: selections, error: selError } = await window.supabaseClient
+            // Participantes = group_members ∩ pichichi (misma base que la clasificación)
+            const [{ data: members }, { data: allFavs }, { data: selections, error: selError }] = await Promise.all([
+                window.supabaseClient
+                    .from('group_members')
+                    .select('user_id')
+                    .eq('group_id', groupId),
+                window.supabaseClient
+                    .from('favorite_selections')
+                    .select('user_id')
+                    .eq('group_id', groupId),
+                window.supabaseClient
                 .from('favorite_selections')
                 .select('*, teams(id, nombre)')
                 .eq('user_id', user.id)
-                .eq('group_id', groupId);
+                    .eq('group_id', groupId),
+            ]);
             if (selError) console.error('Error cargando selecciones Pichichi:', selError);
             if (selections) userPichichiSelections = selections;
+
+            const memberIds = new Set((members || []).map((m) => String(m.user_id)));
+            const withPichichi = new Set((allFavs || []).map((s) => String(s.user_id)));
+            participantIds = [...memberIds].filter((id) => withPichichi.has(id));
         }
 
         // Agrupar partidos por fase, manteniendo el orden de aparición (excluyendo THIRD_PLACE)
@@ -196,8 +208,8 @@ window.loadMatches = async function() {
 
             const grid = section.querySelector('.phase-matches');
             phaseGroups[fase].forEach(match => {
-                const bet = userBets.find(b => b.match_id === match.id);
-                const card = createMatchCard(match, bet, config.multiplier, userPichichiSelections, allGroupBets, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
+                const bet = userBets.find(b => String(b.match_id) === String(match.id));
+                const card = createMatchCard(match, bet, config.multiplier, userPichichiSelections, allGroupBets, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap, participantIds);
                 grid.appendChild(card);
             });
 
@@ -211,7 +223,7 @@ window.loadMatches = async function() {
     }
 };
 
-function createMatchCard(match, userBet, multiplier, userPichichiSelections = [], allGroupBets = [], maxFifaPoints = 1000, teamsFifaMap = {}, teamsNameToId = {}, aliasMap = {}) {
+function createMatchCard(match, userBet, multiplier, userPichichiSelections = [], allGroupBets = [], maxFifaPoints = 1000, teamsFifaMap = {}, teamsNameToId = {}, aliasMap = {}, participantIds = []) {
     const PS = window.PichichiScoring;
     if (!PS) {
         console.error('PichichiScoring no cargado');
@@ -238,16 +250,19 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
     let matchPointsHtml = '';
 
     if (PS.isMatchFinished(match)) {
-        let resultado = 'X';
-        if (match.goles_local > match.goles_visitante) resultado = '1';
-        else if (match.goles_visitante > match.goles_local) resultado = '2';
-
         if (userBet) {
-            betResult = userBet.prediccion === resultado;
-            const matchBets = allGroupBets.filter(b => b.match_id === match.id);
-            const failedBets = matchBets.length - matchBets.filter(b => b.prediccion === resultado).length;
-            if (betResult) {
-                betPointsEarned = failedBets * multiplier;
+            const pred = String(userBet.prediccion || '').trim().toUpperCase();
+            const resultado = PS.getMatchResult?.(match);
+            betResult = resultado != null && pred === resultado;
+            if (betResult && PS.calcBetPointsForMatch) {
+                const currentUser = window.getCurrentUser?.();
+                const { pointsForUser } = PS.calcBetPointsForMatch({
+                    match,
+                    bets: allGroupBets,
+                    participantIds,
+                    multiplier,
+                });
+                betPointsEarned = pointsForUser(currentUser?.id || userBet.user_id);
             }
         }
 
@@ -391,7 +406,7 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
         const btns = card.querySelectorAll('.bet-btn');
         btns.forEach(btn => {
             btn.addEventListener('click', async (e) => {
-                const matchId = parseInt(e.target.getAttribute('data-match'), 10);
+                const matchId = e.target.getAttribute('data-match');
                 const pred = e.target.getAttribute('data-pred');
 
                 // Feedback visual instantáneo

@@ -159,6 +159,111 @@ const API = {
         };
     },
 
+    // Apuestas de toda la porra (RPC public security definer + fallback SELECT).
+    getGroupBets: async (groupId) => {
+        if (!window.supabaseClient || groupId == null || groupId === '') return [];
+
+        const gidNum = Number(groupId);
+        const gid = Number.isFinite(gidNum) ? gidNum : groupId;
+        const byKey = new Map();
+        const merge = (rows) => {
+            (rows || []).forEach((b) => {
+                if (!b) return;
+                const key = b.id != null
+                    ? `id:${b.id}`
+                    : `${String(b.user_id)}|${String(b.match_id)}`;
+                byKey.set(key, {
+                    id: b.id,
+                    user_id: b.user_id,
+                    match_id: b.match_id,
+                    group_id: b.group_id,
+                    prediccion: b.prediccion,
+                    fecha_apuesta: b.fecha_apuesta,
+                });
+            });
+        };
+
+        const normalizeRpcPayload = (data) => {
+            if (data == null) return [];
+            if (Array.isArray(data)) return data;
+            if (typeof data === 'string') {
+                try {
+                    const parsed = JSON.parse(data);
+                    return Array.isArray(parsed) ? parsed : [];
+                } catch (_) {
+                    return [];
+                }
+            }
+            // jsonb object that is already an array-like
+            if (typeof data === 'object') return Array.isArray(data) ? data : [];
+            return [];
+        };
+
+        // 1) RPC en schema public (migración 2026-07-19)
+        const publicClient = window.supabasePublicClient;
+        if (publicClient && Number.isFinite(gidNum)) {
+            const { data, error } = await publicClient.rpc('get_group_bets', { p_group_id: gidNum });
+            if (!error) {
+                const rows = normalizeRpcPayload(data);
+                merge(rows);
+                const users = new Set(rows.map((b) => String(b.user_id)));
+                console.log('[getGroupBets] via public.rpc:', rows.length, 'users=', users.size);
+                if (rows.length > 0) return Array.from(byKey.values());
+            } else {
+                console.warn('[getGroupBets] public.rpc falló:', error.message || error);
+            }
+        }
+
+        // 2) RPC en schema porra
+        if (Number.isFinite(gidNum)) {
+            const { data, error } = await window.supabaseClient.rpc('get_group_bets', { p_group_id: gidNum });
+            if (!error) {
+                const rows = normalizeRpcPayload(data);
+                merge(rows);
+                console.log('[getGroupBets] via porra.rpc:', rows.length);
+                if (rows.length > 0) return Array.from(byKey.values());
+            } else {
+                console.warn('[getGroupBets] porra.rpc falló:', error.message || error);
+            }
+        }
+
+        // 3) SELECT directo
+        const selects = await Promise.all([
+            window.supabaseClient
+                .from('bets')
+                .select('id, user_id, match_id, group_id, prediccion, fecha_apuesta')
+                .eq('group_id', gid),
+            window.supabaseClient
+                .from('bets')
+                .select('id, user_id, match_id, group_id, prediccion, fecha_apuesta')
+                .eq('group_id', groupId),
+        ]);
+        selects.forEach((res, idx) => {
+            if (res.error) {
+                console.warn(`[getGroupBets] select[${idx}]:`, res.error.message || res.error);
+                return;
+            }
+            merge(res.data);
+        });
+
+        const me = window.getCurrentUser?.() || window.currentUser;
+        if (me?.id) {
+            const { data: mine } = await window.supabaseClient
+                .from('bets')
+                .select('id, user_id, match_id, group_id, prediccion, fecha_apuesta')
+                .eq('user_id', me.id)
+                .eq('group_id', groupId);
+            merge(mine);
+        }
+
+        const users = new Set([...byKey.values()].map((b) => String(b.user_id)));
+        console.log('[getGroupBets] via SELECT:', byKey.size, 'users=', users.size, 'groupId=', groupId);
+        if (users.size <= 1) {
+            console.warn('[getGroupBets] Solo se ven apuestas de', users.size, 'usuario(s). Ejecuta la migración SQL.');
+        }
+        return Array.from(byKey.values());
+    },
+
     // Valores/bombos configurados por porra
     getGroupTeamValues: async (groupId) => {
         if (!window.supabaseClient || !groupId) return [];

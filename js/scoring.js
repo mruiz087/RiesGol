@@ -37,11 +37,18 @@ window.loadRanking = async function() {
             .select('id, fecha_inicio, equipo_local_id, equipo_visitante_id, equipo_local_nombre, equipo_visitante_nombre, goles_local, goles_visitante, fase, estado')
             .eq('tournament_id', tournamentId);
 
-        // ─── Obtener apuestas del grupo ──────────────────────────────
-        const { data: bets } = await window.supabaseClient
-            .from('bets')
-            .select('user_id, match_id, prediccion')
-            .eq('group_id', groupId);
+        // ─── Obtener apuestas del grupo (RPC + SELECT; todas las del grupo) ─
+        const bets = await window.apiClient.getGroupBets(groupId);
+        console.log('[Clasificación] groupId=', groupId, 'bets=', bets.length);
+
+        const betUserIds = new Set(bets.map((b) => String(b.user_id)));
+        const memberIds = new Set((members || []).map((m) => String(m.user_id)));
+        if (memberIds.size > 1 && betUserIds.size <= 1) {
+            console.warn('[Clasificación] Posible RLS: solo se ven apuestas de', betUserIds.size, 'usuario(s). bets=', bets.length);
+            window.toast?.error?.(
+                'SQL pendiente: ejecuta docs/migrations/2026-07-19_bets_group_select_rls.sql en Supabase (sin esto el (X) y los puntos fallan).'
+            );
+        }
 
         // ─── Obtener selecciones Pichichi del grupo ───────────────────
         const { data: favoriteSelections, error: favError } = await window.supabaseClient
@@ -91,7 +98,8 @@ window.loadRanking = async function() {
 
         // Inicializar solo usuarios con pichichi
         eligibleMembers.forEach(member => {
-            userPoints[member.user_id] = {
+            const uid = String(member.user_id);
+            userPoints[uid] = {
                 userId: member.user_id,
                 name: member.users?.name || 'Anónimo',
                 betPoints: 0,
@@ -100,7 +108,7 @@ window.loadRanking = async function() {
                 missedClosedBets: 0,
                 isPaqueteEligible: true
             };
-            userPichichiPoints[member.user_id] = 0;
+            userPichichiPoints[uid] = 0;
         });
 
         // Multiplicadores de fase
@@ -115,77 +123,82 @@ window.loadRanking = async function() {
         };
 
         // ─── Calcular puntos de apuestas ───────────────────────────────
-        if (matches && bets) {
+        if (matches && bets && window.PichichiScoring?.calcBetPointsForMatch) {
             const validMatches = matches.filter(m => (m.fase || 'GROUP_STAGE') !== 'THIRD_PLACE' && (m.fase || 'GROUP_STAGE') !== 'THIRD_PLACE_MATCH');
+            const participantIds = Object.keys(userPoints);
 
             validMatches.forEach(match => {
-                if (match.estado !== 'finalizado') return;
-                
-                const multiplier = phaseMultipliers[match.fase] || 1;
-                
-                // Determinar resultado real
-                let resultado = 'X';
-                if (match.goles_local > match.goles_visitante) resultado = '1';
-                else if (match.goles_visitante > match.goles_local) resultado = '2';
+                if (!window.PichichiScoring.isMatchFinished(match)) return;
 
-                // Obtener apuestas para este partido
-                const matchBets = bets.filter(b => b.match_id === match.id);
-                const totalBets = matchBets.length;
-                
-                if (totalBets === 0) return;
+                const multiplier = phaseMultipliers[match.fase] || window.PichichiScoring.getPhaseMultiplier(match.fase) || 1;
+                const { pointsByUser } = window.PichichiScoring.calcBetPointsForMatch({
+                    match,
+                    bets,
+                    participantIds,
+                    multiplier,
+                });
 
-                // Contar aciertos
-                const correctBets = matchBets.filter(b => b.prediccion === resultado).length;
-                const failedBets = totalBets - correctBets;
-
-                // Asignar puntos: cada usuario obtiene puntos = usuarios que fallaron * multiplicador
-                matchBets.forEach(bet => {
-                    const userId = bet.user_id;
-                    if (userPoints[userId]) {
-                        if (bet.prediccion === resultado) {
-                            userPoints[userId].betPoints = round2(userPoints[userId].betPoints + (failedBets * multiplier));
-                        }
+                Object.entries(pointsByUser).forEach(([uid, pts]) => {
+                    if (userPoints[uid]) {
+                        userPoints[uid].betPoints = round2(userPoints[uid].betPoints + pts);
                     }
                 });
             });
 
-            // Elegibilidad Premio Paquete (rolling): debe haber apostado en todos los partidos "cerrados"
+            // Elegibilidad Premio Paquete (rolling): apuesta en todos los partidos cerrados y apostables
             const now = new Date();
             const closedMatches = validMatches.filter(m => {
+                const local = m.equipo_local_nombre;
+                const away = m.equipo_visitante_nombre;
+                if (!local || !away || local === 'Por definir' || away === 'Por definir') return false;
                 if (!m.fecha_inicio) return m.estado !== 'pendiente';
                 return new Date(m.fecha_inicio) < now;
             });
 
-            // Indexar apuestas por usuario para chequear faltas rápido
+            // Indexar apuestas por usuario (ids como string; evita falsos "faltan apuestas")
+            const idKey = (id) => (id == null ? '' : String(id));
             const betMatchIdsByUser = {};
             bets.forEach(b => {
-                const uid = b.user_id;
+                const uid = idKey(b.user_id);
                 if (!betMatchIdsByUser[uid]) betMatchIdsByUser[uid] = new Set();
-                betMatchIdsByUser[uid].add(Number(b.match_id));
+                betMatchIdsByUser[uid].add(idKey(b.match_id));
             });
 
+            console.log(
+                '[Clasificación] closedMatches=', closedMatches.length,
+                'betsUsers=', Object.keys(betMatchIdsByUser).length,
+                'betsTotal=', bets.length
+            );
+
             members.forEach(member => {
-                const userId = member.user_id;
+                const userId = idKey(member.user_id);
                 const userSet = betMatchIdsByUser[userId] || new Set();
                 let missed = 0;
+                const missedIds = [];
                 closedMatches.forEach(match => {
-                    if (!userSet.has(Number(match.id))) missed++;
+                    if (!userSet.has(idKey(match.id))) {
+                        missed++;
+                        if (missedIds.length < 5) missedIds.push(idKey(match.id));
+                    }
                 });
                 if (userPoints[userId]) {
                     userPoints[userId].missedClosedBets = missed;
                     userPoints[userId].isPaqueteEligible = missed === 0;
+                    if (missed > 0) {
+                        console.log('[Clasificación] (X)', userPoints[userId].name, 'missed=', missed, 'ej=', missedIds);
+                    }
                 }
             });
         }
 
         // ─── Calcular puntos Pichichi ───────────────────────────────────
         if (matches && favoriteSelections && groupValues?.length && window.PichichiScoring) {
-            const fifaValues = Object.values(teamsFifaMap);
+            const fifaValues = Object.values(teamsFifaMap).map(Number).filter((v) => Number.isFinite(v) && v > 0);
             const maxFifaPoints = fifaValues.length > 0 ? Math.max(...fifaValues) : 1000;
 
             const selectionsByUser = {};
             favoriteSelections.forEach(selection => {
-                const userId = selection.user_id;
+                const userId = String(selection.user_id);
                 if (!selectionsByUser[userId]) selectionsByUser[userId] = [];
                 selectionsByUser[userId].push(selection);
             });

@@ -221,13 +221,25 @@ window.hideLoading = function() {
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
+            navigator.serviceWorker.register('./sw.js?v=34')
                 .then(registration => {
                     console.log('SW registrado con éxito: ', registration.scope);
+                    registration.update();
+                    // Si hay un SW esperando, forzar activación
+                    if (registration.waiting) {
+                        registration.waiting.postMessage?.({ type: 'SKIP_WAITING' });
+                    }
                 })
                 .catch(err => {
                     console.log('Fallo en el registro del SW: ', err);
                 });
+
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
         });
     }
 }
