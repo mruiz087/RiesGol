@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riesgol-v40';
+const CACHE_NAME = 'riesgol-v42';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',

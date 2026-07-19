@@ -19,6 +19,12 @@
     let cachedMembers = [];
     let cachedPhaseOrder = [];
     let cachedPhaseGroups = {};
+    let cachedSelectionsByUser = {};
+    let cachedParticipantIds = [];
+    let cachedMaxFifa = 1000;
+    let cachedTeamsFifaMap = {};
+    let cachedTeamsNameToId = {};
+    let cachedAliasMap = {};
     let interactionsBound = false;
 
     function matchKey(id) {
@@ -160,17 +166,59 @@
         `;
     }
 
-    function renderUserBetPanel(matchId, userId) {
-        const pred = getUserPrediction(matchId, userId);
-        if (!pred) {
-            return '<p class="results-user-bet results-user-bet--none">Sin apuesta</p>';
-        }
+    function formatPts(n) {
+        const v = Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
+        return v.toFixed(2);
+    }
+
+    function renderUserBetPanel(match, userId) {
+        const pred = getUserPrediction(match.id, userId);
         const classMap = { '1': 'result-home', X: 'result-draw', '2': 'result-away' };
+        const PS = window.PichichiScoring;
+        const multiplier = getPhaseConfig(match.fase || 'GROUP_STAGE').multiplier;
+
+        let betPts = 0;
+        if (pred) {
+            const resultado = PS?.getMatchResult?.(match);
+            const acierto = resultado != null && pred === resultado;
+            if (acierto && PS?.calcBetPointsForMatch) {
+                const { pointsForUser } = PS.calcBetPointsForMatch({
+                    match,
+                    bets: cachedBets,
+                    participantIds: cachedParticipantIds,
+                    multiplier,
+                });
+                betPts = pointsForUser(userId) || 0;
+            }
+        }
+
+        const selections = cachedSelectionsByUser[String(userId)] || [];
+        let pichPts = 0;
+        if (PS?.calcMatchPichichiForUser && selections.length) {
+            const { total } = PS.calcMatchPichichiForUser(
+                match,
+                selections,
+                cachedMaxFifa,
+                cachedTeamsFifaMap,
+                cachedTeamsNameToId,
+                cachedAliasMap
+            );
+            pichPts = Number(total) || 0;
+        }
+
+        const betLine = pred
+            ? `Apuesta: <span class="results-user-bet-pill ${classMap[pred] || ''}">${pred}</span>`
+            : '<span class="results-user-bet--none">Sin apuesta</span>';
+
         return `
-            <p class="results-user-bet">
-                Apuesta:
-                <span class="results-user-bet-pill ${classMap[pred] || ''}">${pred}</span>
-            </p>
+            <div class="results-user-bet">
+                <p class="results-user-bet-line">${betLine}</p>
+                <p class="results-user-bet-line results-user-bet-points">
+                    <span>Aciertos <strong>+${formatPts(betPts)}</strong></span>
+                    <span class="results-user-bet-sep" aria-hidden="true">·</span>
+                    <span>Pichichi <strong>+${formatPts(pichPts)}</strong></span>
+                </p>
+            </div>
         `;
     }
 
@@ -179,13 +227,14 @@
         return openMatchIds.has(matchKey(matchId));
     }
 
-    function renderInlinePanel(matchId) {
-        if (!shouldShowPanel(matchId)) return '';
+    function renderInlinePanel(match) {
+        const mid = matchKey(match.id);
+        if (!shouldShowPanel(mid)) return '';
         const inner = selectedUserId
-            ? renderUserBetPanel(matchId, selectedUserId)
-            : renderGroupStatsPanel(matchId);
+            ? renderUserBetPanel(match, selectedUserId)
+            : renderGroupStatsPanel(mid);
         return `
-            <tr class="results-stats-row" data-match-id="${matchKey(matchId)}">
+            <tr class="results-stats-row" data-match-id="${mid}">
                 <td class="results-date" aria-hidden="true"></td>
                 <td colspan="3" class="results-stats-merged">
                     <div class="results-inline-stats">${inner}</div>
@@ -213,9 +262,10 @@
                         ${teamCell(match.equipo_visitante_nombre, 'away')}
                     </td>
                 </tr>
-                ${renderInlinePanel(mid)}
+                ${renderInlinePanel(match)}
             `;
         }).join('');
+
 
         return `
             <div class="results-table-wrap">
@@ -445,6 +495,12 @@
         cachedMembers = [];
         cachedPhaseOrder = [];
         cachedPhaseGroups = {};
+        cachedSelectionsByUser = {};
+        cachedParticipantIds = [];
+        cachedMaxFifa = 1000;
+        cachedTeamsFifaMap = {};
+        cachedTeamsNameToId = {};
+        cachedAliasMap = {};
 
         window.showLoading();
         try {
@@ -472,10 +528,21 @@
                 return;
             }
 
-            const [members, rawBets] = await Promise.all([
+            const [members, rawBets, favRes, teamsCatalog, groupValues, aliases] = await Promise.all([
                 loadMemberNames(groupId),
                 loadGroupBets(groupId),
+                window.supabaseClient
+                    .from('favorite_selections')
+                    .select('*, teams(id, nombre)')
+                    .eq('group_id', groupId),
+                window.apiClient.getTeams(tournamentId),
+                window.apiClient.getGroupTeamValues(groupId),
+                window.PichichiScoring?.loadTeamAliases?.() || Promise.resolve([]),
             ]);
+
+            if (favRes.error) {
+                console.warn('[Resultados] Error favorite_selections:', favRes.error);
+            }
 
             cachedMembers = members;
             const nameByUserId = {};
@@ -489,6 +556,34 @@
                 users: { name: nameByUserId[String(b.user_id)] || 'Anónimo' },
                 _userName: nameByUserId[String(b.user_id)] || 'Anónimo',
             }));
+
+            const favs = favRes.data || [];
+            const withPichichi = new Set();
+            cachedSelectionsByUser = {};
+            favs.forEach((sel) => {
+                const uid = String(sel.user_id);
+                withPichichi.add(uid);
+                if (!cachedSelectionsByUser[uid]) cachedSelectionsByUser[uid] = [];
+                cachedSelectionsByUser[uid].push(sel);
+            });
+            cachedParticipantIds = (members || [])
+                .map((m) => String(m.user_id))
+                .filter((id) => withPichichi.has(id));
+
+            if (window.PichichiScoring?.buildTeamMaps) {
+                const maps = window.PichichiScoring.buildTeamMaps(
+                    teamsCatalog || [],
+                    groupValues || [],
+                    aliases || []
+                );
+                cachedTeamsFifaMap = maps.teamsFifaMap;
+                cachedTeamsNameToId = maps.teamsNameToId;
+                cachedAliasMap = maps.aliasMap;
+                const fifaValues = Object.values(cachedTeamsFifaMap)
+                    .map(Number)
+                    .filter((v) => Number.isFinite(v) && v > 0);
+                cachedMaxFifa = fifaValues.length > 0 ? Math.max(...fifaValues) : 1000;
+            }
 
             console.log('[Resultados] groupId=', groupId, 'bets=', cachedBets.length, 'matchIds=', cachedBets.map(b => b.match_id));
 
