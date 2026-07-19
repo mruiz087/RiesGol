@@ -322,15 +322,31 @@ window.loadRanking = async function() {
                 tr.style.fontWeight = 'bold';
             }
 
+            tr.classList.add('ranking-row-clickable');
+            tr.title = 'Ver apuestas en Resultados';
+            tr.setAttribute('role', 'link');
+            tr.tabIndex = 0;
             tr.innerHTML = `
                 <td><strong>${pos}</strong></td>
                 <td>
-                    ${user.name}
+                    <span class="ranking-user-link">${user.name}</span>
                     ${user.isPaqueteEligible ? '' : '<span title="No elegible para Premio Paquete (faltan apuestas en partidos cerrados)" style="color:var(--danger); font-size:0.8rem; margin-left: 8px;">(X)</span>'}
                     ${badgeHtml}
                 </td>
                 <td style="color:var(--primary); font-weight: 800;">${formatPoints(user.totalPoints)}</td>
             `;
+            const openUserResults = () => {
+                if (typeof window.navigateTo === 'function') {
+                    window.navigateTo('results-view', { userId: user.userId });
+                }
+            };
+            tr.addEventListener('click', openUserResults);
+            tr.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openUserResults();
+                }
+            });
             tbody.appendChild(tr);
         });
 

@@ -431,12 +431,15 @@
             .sort((a, b) => a.name.localeCompare(b.name, 'es'));
     }
 
-    window.loadResults = async function () {
+    window.loadResults = async function (options = {}) {
         const container = document.getElementById('results-container');
         if (!container) return;
 
-        selectedUserId = null;
-        expandAll = false;
+        const focusUserId = options.userId != null && options.userId !== ''
+            ? String(options.userId)
+            : null;
+        selectedUserId = focusUserId;
+        expandAll = !!focusUserId;
         openMatchIds = new Set();
         cachedBets = [];
         cachedMembers = [];

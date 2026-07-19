@@ -604,6 +604,19 @@ h1, h2, h3, h4 {
     transform: scale(1.01);
 }
 
+.premium-table tbody tr.ranking-row-clickable {
+    cursor: pointer;
+}
+
+.premium-table tbody tr.ranking-row-clickable:hover .ranking-user-link {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.ranking-user-link {
+    transition: color var(--trans-fast);
+}
+
 /* Match Cards */
 .matches-grid {
     display: grid;

@@ -125,7 +125,7 @@ const PICHICHI_GATED_VIEWS = new Set([
 ]);
 
 // Función para cambiar de vista (SPA)
-window.navigateTo = async function(viewId) {
+window.navigateTo = async function(viewId, options = {}) {
     let resolvedViewId = viewId;
 
     if (
@@ -158,7 +158,7 @@ window.navigateTo = async function(viewId) {
         } else if (resolvedViewId === 'matches-view' && window.loadMatches) {
             window.loadMatches();
         } else if (resolvedViewId === 'results-view' && window.loadResults) {
-            window.loadResults();
+            window.loadResults({ userId: options.userId || null });
         } else if (resolvedViewId === 'pichichi-view' && window.loadPichichiData) {
             window.loadPichichiData();
         } else if (resolvedViewId === 'group-admin-view' && window.Admin) {
@@ -221,7 +221,7 @@ window.hideLoading = function() {
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=38')
+            navigator.serviceWorker.register('./sw.js?v=39')
                 .then(registration => {
                     console.log('SW registrado con éxito: ', registration.scope);
                     registration.update();
