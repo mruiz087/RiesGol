@@ -221,7 +221,7 @@ window.hideLoading = function() {
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js?v=34')
+            navigator.serviceWorker.register('./sw.js?v=38')
                 .then(registration => {
                     console.log('SW registrado con éxito: ', registration.scope);
                     registration.update();

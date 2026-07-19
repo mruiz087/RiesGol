@@ -624,7 +624,8 @@ h1, h2, h3, h4 {
 .phase-summary {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
     padding: 1rem 1.5rem;
     background: #1a1d2c;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -657,6 +658,14 @@ h1, h2, h3, h4 {
     font-weight: 600;
     font-size: 1.1rem;
     flex: 1;
+    min-width: 0;
+}
+
+.phase-user-points {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .phase-multiplier {
@@ -1646,6 +1655,35 @@ h1, h2, h3, h4 {
     .matches-grid,
     .phase-matches {
         grid-template-columns: 1fr;
+    }
+
+    .phase-summary {
+        padding: 0.85rem 1rem;
+        gap: 0.45rem 0.65rem;
+    }
+
+    .phase-label {
+        font-size: 1rem;
+    }
+
+    .phase-user-points {
+        flex: 1 1 100%;
+        order: 5;
+        white-space: normal;
+        font-size: 0.78rem;
+    }
+
+    .phase-multiplier {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.55rem;
+    }
+
+    .phase-count {
+        font-size: 0.8rem;
+    }
+
+    .phase-chevron {
+        margin-left: auto;
     }
 
     .stats-match-line,

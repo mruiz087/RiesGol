@@ -187,10 +187,53 @@ window.loadMatches = async function() {
             if (hasPending) { defaultOpenPhase = fase; break; }
         }
 
+        const PS = window.PichichiScoring;
+        const round2 = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
+        const formatPoints = (n) => round2(n).toFixed(2);
+        const currentUserId = user?.id;
+
+        function calcPhaseUserPoints(faseMatches, multiplier) {
+            let betPts = 0;
+            let pichPts = 0;
+            if (!PS || !currentUserId) return { betPts, pichPts };
+
+            faseMatches.forEach((match) => {
+                const finished = PS.isScoringMatch
+                    ? PS.isScoringMatch(match)
+                    : PS.isMatchFinished?.(match);
+                if (!finished) return;
+
+                if (PS.calcBetPointsForMatch) {
+                    const { pointsForUser } = PS.calcBetPointsForMatch({
+                        match,
+                        bets: allGroupBets,
+                        participantIds,
+                        multiplier,
+                    });
+                    betPts += pointsForUser(currentUserId) || 0;
+                }
+
+                if (PS.calcMatchPichichiForUser) {
+                    const { total } = PS.calcMatchPichichiForUser(
+                        match,
+                        userPichichiSelections,
+                        maxFifaPoints,
+                        teamsFifaMap,
+                        teamsNameToId,
+                        aliasMap
+                    );
+                    pichPts += Number(total) || 0;
+                }
+            });
+
+            return { betPts: round2(betPts), pichPts: round2(pichPts) };
+        }
+
         // Renderizar cada fase como sección desplegable
         phaseOrder.forEach(fase => {
             const config = getPhaseConfig(fase);
             const isOpen = fase === defaultOpenPhase;
+            const { betPts, pichPts } = calcPhaseUserPoints(phaseGroups[fase], config.multiplier);
 
             const section = document.createElement('details');
             section.className = 'phase-section';
@@ -199,6 +242,7 @@ window.loadMatches = async function() {
             section.innerHTML = `
                 <summary class="phase-summary">
                     <span class="phase-label">${config.label}</span>
+                    <span class="phase-user-points">Aciertos ${formatPoints(betPts)} · Pichichi ${formatPoints(pichPts)}</span>
                     <span class="phase-multiplier">✕${config.multiplier} puntos</span>
                     <span class="phase-count">${phaseGroups[fase].length} partidos</span>
                     <span class="phase-chevron">›</span>
