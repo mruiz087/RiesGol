@@ -2453,3 +2453,71 @@ h1, h2, h3, h4 {
         font-size: 0.9rem;
     }
 }
+
+/* Opciones: normas de la porra */
+.opciones-rules-intro {
+    color: var(--text-muted);
+    margin-bottom: 1.25rem;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+
+.opciones-rules-block {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.75rem;
+    background: rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.opciones-rules-block > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 0.85rem 1rem;
+    font-weight: 600;
+    color: var(--text-main);
+    user-select: none;
+}
+
+.opciones-rules-block > summary::-webkit-details-marker {
+    display: none;
+}
+
+.opciones-rules-block > summary::after {
+    content: '›';
+    float: right;
+    color: var(--text-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: transform 0.15s ease;
+}
+
+.opciones-rules-block[open] > summary::after {
+    transform: rotate(90deg);
+}
+
+.opciones-rules-block ul {
+    margin: 0;
+    padding: 0 1rem 1rem 1.75rem;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.opciones-rules-block li {
+    margin-bottom: 0.4rem;
+}
+
+.opciones-rules-block li:last-child {
+    margin-bottom: 0;
+}
+
+.opciones-rules-multipliers {
+    list-style: none;
+    padding-left: 1rem !important;
+}
+
+.opciones-rules-multipliers li {
+    font-variant-numeric: tabular-nums;
+}
+

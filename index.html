@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="./css/styles.css?v=39">
+    <link rel="stylesheet" href="./css/styles.css?v=40">
 
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -275,6 +275,59 @@
                     <p style="color: var(--text-muted); margin-bottom: 1rem;">Al cerrar sesión, tendrás que volver a iniciar sesión para acceder a tu cuenta.</p>
                     <button id="logout-btn" class="btn-secondary" style="width: 100%;">Cerrar Sesión</button>
                 </div>
+
+                <div class="glass-panel opciones-rules" style="max-width: 640px; margin: 2rem auto 0; padding: 2rem;">
+                    <h3 style="margin-bottom: 0.75rem;">Normas y funcionamiento</h3>
+                    <p class="opciones-rules-intro">Resumen de cómo se juega y se puntúa en RiesGol. Puedes desplegar cada bloque.</p>
+
+                    <details class="opciones-rules-block" open>
+                        <summary>Apuestas 1-X-2</summary>
+                        <ul>
+                            <li>Pronostica <strong>1</strong> (gana local), <strong>X</strong> (empate) o <strong>2</strong> (gana visitante).</li>
+                            <li>La apuesta se <strong>cierra al inicio</strong> del partido.</li>
+                            <li>Solo cuenta el resultado de los <strong>90 minutos</strong> (no prórroga ni penaltis).</li>
+                            <li>Si no apuestas: <strong>0 puntos</strong> en ese partido y quedas fuera del Premio Paquete.</li>
+                        </ul>
+                    </details>
+
+                    <details class="opciones-rules-block">
+                        <summary>Puntos por acierto</summary>
+                        <ul>
+                            <li>Si aciertas, sumas tantos puntos como <strong>participantes que no acertaron</strong> (incluye a quienes no apostaron), multiplicado por la fase.</li>
+                            <li>Ejemplo: 10 jugadores, 2 aciertan y 8 fallan → cada acertante suma <strong>8</strong> en fase de grupos (×1).</li>
+                        </ul>
+                    </details>
+
+                    <details class="opciones-rules-block">
+                        <summary>Multiplicadores de fase</summary>
+                        <ul class="opciones-rules-multipliers">
+                            <li>Fase de grupos → ×1</li>
+                            <li>Dieciseisavos → ×2</li>
+                            <li>Octavos → ×3</li>
+                            <li>Cuartos → ×4</li>
+                            <li>Semifinal → ×5</li>
+                            <li>Final → ×6</li>
+                        </ul>
+                    </details>
+
+                    <details class="opciones-rules-block">
+                        <summary>Pichichi (equipos favoritos)</summary>
+                        <ul>
+                            <li>Debes elegir <strong>un equipo por bombo</strong> al entrar en la porra.</li>
+                            <li>Por cada gol de tus favoritos en partidos finalizados sumas: goles × multiplicador de fase × factor FIFA (FIFA del equipo más fuerte de la porra ÷ FIFA de tu equipo).</li>
+                            <li>Los favoritos se pueden cambiar hasta el <strong>primer partido</strong> del torneo; después quedan fijos.</li>
+                        </ul>
+                    </details>
+
+                    <details class="opciones-rules-block">
+                        <summary>Clasificación y premios</summary>
+                        <ul>
+                            <li><strong>Total</strong> = puntos de apuestas + puntos Pichichi.</li>
+                            <li>El admin puede activar un <strong>premio especial</strong> en una posición concreta (p. ej. 3º).</li>
+                            <li><strong>Premio Paquete</strong> (último oficial): solo entre quienes han apostado en todos los partidos ya empezados/cerrados. Fallar no te elimina; no apostar sí.</li>
+                        </ul>
+                    </details>
+                </div>
             </section>
 
             <!-- Group Admin View -->
@@ -369,7 +422,7 @@
 
     <!-- Scripts -->
     <script src="./js/supabase.js?v=39" defer></script>
-    <script src="./js/app.js?v=39" defer></script>
+    <script src="./js/app.js?v=40" defer></script>
     <script src="./js/auth.js" defer></script>
     <script src="./js/api.js?v=39" defer></script>
     <script src="./js/groups.js" defer></script>
