@@ -194,6 +194,8 @@ window.navigateTo = async function(viewId, options = {}) {
             window.Admin.loadSpecialPrizeConfig();
             window.Admin.loadTournamentStatus();
             window.Admin.loadTeamValuesEditor();
+            window.Admin.loadScoringRulesEditor?.();
+            window.Admin.switchAdminTab?.('general');
         } else if (resolvedViewId === 'opciones-view' && window.loadOpciones) {
             window.loadOpciones();
         }

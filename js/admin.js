@@ -573,8 +573,77 @@ const Admin = {
         }
     },
 
+    loadScoringRulesEditor: async () => {
+        const form = document.getElementById('scoring-rules-form');
+        if (!form || !window.ScoringRules) return;
+
+        const groupId = window.Groups?.currentGroupId;
+        if (!groupId) {
+            form.innerHTML = '<p class="text-muted">Selecciona una porra primero.</p>';
+            return;
+        }
+
+        const rules = await window.apiClient.getScoringRules(groupId);
+        form.innerHTML = window.ScoringRules.renderAdminRulesFormHtml(rules);
+
+        form.querySelectorAll('[data-rule-enabled]').forEach((cb) => {
+            cb.addEventListener('change', () => {
+                const key = cb.getAttribute('data-rule-enabled');
+                form.querySelectorAll(`[data-rule="${key}"]`).forEach((input) => {
+                    input.disabled = !cb.checked;
+                });
+            });
+        });
+    },
+
+    saveScoringRulesConfig: async (e) => {
+        e.preventDefault();
+        const groupId = window.Groups?.currentGroupId;
+        const form = document.getElementById('scoring-rules-form');
+        if (!groupId || !form || !window.ScoringRules) return;
+
+        const rules = window.ScoringRules.readRulesFromForm(form);
+        window.showLoading?.();
+        try {
+            const result = await window.apiClient.updateScoringRules(groupId, rules);
+            if (result?.success) {
+                window.toast?.success('Reglas de puntuación guardadas');
+                await Admin.loadScoringRulesEditor();
+            } else {
+                window.toast?.error(result?.error || 'No se pudieron guardar las reglas');
+            }
+        } finally {
+            window.hideLoading?.();
+        }
+    },
+
+    switchAdminTab: (tabId) => {
+        const root = document.getElementById('group-admin-view');
+        if (!root || !tabId) return;
+
+        root.querySelectorAll('.admin-tab').forEach((btn) => {
+            const active = btn.getAttribute('data-admin-tab') === tabId;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', String(active));
+        });
+
+        root.querySelectorAll('.admin-tab-panel').forEach((panel) => {
+            const active = panel.getAttribute('data-admin-panel') === tabId;
+            panel.classList.toggle('active', active);
+            if (active) panel.removeAttribute('hidden');
+            else panel.setAttribute('hidden', '');
+        });
+    },
+
     // Inicializar event listeners
     init: () => {
+        document.getElementById('group-admin-view')?.addEventListener('click', (e) => {
+            const tabBtn = e.target.closest?.('.admin-tab');
+            if (!tabBtn) return;
+            e.preventDefault();
+            Admin.switchAdminTab(tabBtn.getAttribute('data-admin-tab'));
+        });
+
         document.getElementById('special-prize-enabled')?.addEventListener('change', async (e) => {
             document.getElementById('special-position-group').style.display = e.target.checked ? 'block' : 'none';
             if (e.target.checked) {
@@ -589,6 +658,7 @@ const Admin = {
         document.getElementById('special-prize-form')?.addEventListener('submit', Admin.saveSpecialPrizeConfig);
         document.getElementById('tournament-status-form')?.addEventListener('submit', Admin.saveTournamentStatus);
         document.getElementById('team-values-form')?.addEventListener('submit', Admin.saveTeamValues);
+        document.getElementById('scoring-rules-form')?.addEventListener('submit', Admin.saveScoringRulesConfig);
         document.getElementById('delete-group-btn')?.addEventListener('click', Admin.deleteCurrentGroup);
 
         document.getElementById('sync-matches-btn')?.addEventListener('click', async () => {

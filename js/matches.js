@@ -115,9 +115,13 @@ window.loadMatches = async function() {
         let teamsFifaMap = {};
         let teamsNameToId = {};
         let aliasMap = {};
+        let scoringRules = window.ScoringRules?.getDefaultScoringRules?.() || {};
+        let bomboByTeamId = {};
 
         const teamsCatalog = await window.apiClient.getTeams(tournamentId);
         const groupValues = await window.apiClient.getGroupTeamValues(groupId);
+        scoringRules = await window.apiClient.getScoringRules(groupId);
+        bomboByTeamId = window.ScoringRules?.buildBomboByTeamId?.(groupValues) || {};
 
         if (teamsCatalog && teamsCatalog.length > 0 && groupValues?.length) {
             const fifaValues = groupValues.map(gv => Number(gv.valor)).filter(v => Number.isFinite(v) && v > 0);
@@ -196,6 +200,7 @@ window.loadMatches = async function() {
             let betPts = 0;
             let pichPts = 0;
             if (!PS || !currentUserId) return { betPts, pichPts };
+            const SR = window.ScoringRules;
 
             faseMatches.forEach((match) => {
                 const finished = PS.isScoringMatch
@@ -203,17 +208,43 @@ window.loadMatches = async function() {
                     : PS.isMatchFinished?.(match);
                 if (!finished) return;
 
-                if (PS.calcBetPointsForMatch) {
-                    const { pointsForUser } = PS.calcBetPointsForMatch({
+                const betCalc = SR?.calcBetPointsForMatchWithRules
+                    ? SR.calcBetPointsForMatchWithRules({
+                        match,
+                        bets: allGroupBets,
+                        participantIds,
+                        multiplier,
+                        rules: scoringRules,
+                    })
+                    : PS.calcBetPointsForMatch?.({
                         match,
                         bets: allGroupBets,
                         participantIds,
                         multiplier,
                     });
-                    betPts += pointsForUser(currentUserId) || 0;
-                }
+                if (betCalc) betPts += betCalc.pointsForUser(currentUserId) || 0;
 
-                if (PS.calcMatchPichichiForUser) {
+                const userBet = allGroupBets.find(
+                    (b) => String(b.match_id) === String(match.id) && String(b.user_id) === String(currentUserId)
+                );
+                const pred = userBet ? String(userBet.prediccion || '').trim().toUpperCase() : null;
+                const resultado = PS.getMatchResult?.(match);
+                const userBetCorrect = pred && resultado ? pred === resultado : (pred ? false : null);
+
+                if (SR?.calcFavoriteMatchBreakdown) {
+                    const br = SR.calcFavoriteMatchBreakdown({
+                        match,
+                        selections: userPichichiSelections,
+                        rules: scoringRules,
+                        maxFifaPoints,
+                        teamsFifaMap,
+                        teamsNameToId,
+                        aliasMap,
+                        bomboByTeamId,
+                        userBetCorrect,
+                    });
+                    pichPts += Number(br.total) || 0;
+                } else if (PS.calcMatchPichichiForUser) {
                     const { total } = PS.calcMatchPichichiForUser(
                         match,
                         userPichichiSelections,
@@ -253,7 +284,7 @@ window.loadMatches = async function() {
             const grid = section.querySelector('.phase-matches');
             phaseGroups[fase].forEach(match => {
                 const bet = userBets.find(b => String(b.match_id) === String(match.id));
-                const card = createMatchCard(match, bet, config.multiplier, userPichichiSelections, allGroupBets, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap, participantIds);
+                const card = createMatchCard(match, bet, config.multiplier, userPichichiSelections, allGroupBets, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap, participantIds, scoringRules, bomboByTeamId);
                 grid.appendChild(card);
             });
 
@@ -267,8 +298,9 @@ window.loadMatches = async function() {
     }
 };
 
-function createMatchCard(match, userBet, multiplier, userPichichiSelections = [], allGroupBets = [], maxFifaPoints = 1000, teamsFifaMap = {}, teamsNameToId = {}, aliasMap = {}, participantIds = []) {
+function createMatchCard(match, userBet, multiplier, userPichichiSelections = [], allGroupBets = [], maxFifaPoints = 1000, teamsFifaMap = {}, teamsNameToId = {}, aliasMap = {}, participantIds = [], scoringRules = null, bomboByTeamId = {}) {
     const PS = window.PichichiScoring;
+    const SR = window.ScoringRules;
     if (!PS) {
         console.error('PichichiScoring no cargado');
         return document.createElement('div');
@@ -276,6 +308,7 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
 
     const round2 = (n) => Math.round(((Number(n) || 0) + Number.EPSILON) * 100) / 100;
     const formatPoints = (n) => round2(n).toFixed(2);
+    const rules = SR?.normalizeScoringRules?.(scoringRules) || scoringRules || {};
 
     const isPast = new Date(match.fecha_inicio) < new Date();
     const isUndefined = match.equipo_local_nombre === 'Por definir' || match.equipo_visitante_nombre === 'Por definir';
@@ -290,54 +323,106 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
     let betResult = null;
     let betPointsEarned = 0;
     let pichichiPointsEarned = 0;
-    let pichichiBreakdownLines = [];
     let matchPointsHtml = '';
+    let loboApplied = false;
 
     if (PS.isMatchFinished(match)) {
+        const currentUser = window.getCurrentUser?.();
         if (userBet) {
             const pred = String(userBet.prediccion || '').trim().toUpperCase();
             const resultado = PS.getMatchResult?.(match);
             betResult = resultado != null && pred === resultado;
-            if (betResult && PS.calcBetPointsForMatch) {
-                const currentUser = window.getCurrentUser?.();
-                const { pointsForUser } = PS.calcBetPointsForMatch({
-                    match,
-                    bets: allGroupBets,
-                    participantIds,
-                    multiplier,
-                });
-                betPointsEarned = pointsForUser(currentUser?.id || userBet.user_id);
+            if (betResult) {
+                const betCalc = SR?.calcBetPointsForMatchWithRules
+                    ? SR.calcBetPointsForMatchWithRules({
+                        match,
+                        bets: allGroupBets,
+                        participantIds,
+                        multiplier,
+                        rules,
+                    })
+                    : PS.calcBetPointsForMatch({
+                        match,
+                        bets: allGroupBets,
+                        participantIds,
+                        multiplier,
+                    });
+                betPointsEarned = betCalc.pointsForUser(currentUser?.id || userBet.user_id);
+                loboApplied = !!betCalc.loboApplied;
             }
         }
 
-        const pichichiResult = PS.calcMatchPichichiForUser(match, userPichichiSelections, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
-        pichichiPointsEarned = pichichiResult.total;
-        pichichiBreakdownLines = pichichiResult.breakdown.map(b =>
-            `${b.teamName}: ${b.goals} gol${b.goals !== 1 ? 'es' : ''} × fase x${b.multiplier} × valor ${b.goalFactor.toFixed(2)}`
-        );
+        const userBetCorrect = userBet
+            ? betResult === true
+            : null;
+
+        let favBreakdown = { total: 0, lines: [], hasFavorite: false, blockedByConsuelo: false };
+        if (SR?.calcFavoriteMatchBreakdown) {
+            favBreakdown = SR.calcFavoriteMatchBreakdown({
+                match,
+                selections: userPichichiSelections,
+                rules,
+                maxFifaPoints,
+                teamsFifaMap,
+                teamsNameToId,
+                aliasMap,
+                bomboByTeamId,
+                userBetCorrect,
+            });
+            pichichiPointsEarned = Number(favBreakdown.total) || 0;
+        } else {
+            const pichichiResult = PS.calcMatchPichichiForUser(match, userPichichiSelections, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
+            pichichiPointsEarned = pichichiResult.total;
+            favBreakdown = {
+                total: pichichiResult.total,
+                lines: pichichiResult.breakdown.map(b => ({
+                    key: 'goals',
+                    label: 'Pichichi',
+                    points: b.points,
+                    detail: `${b.teamName}: ${b.goals} gol(es)`,
+                })),
+                hasFavorite: pichichiResult.hasFavorite,
+            };
+        }
 
         const totalPoints = betPointsEarned + pichichiPointsEarned;
 
         let breakdownHtml = '';
         if (userBet) {
+            const betLabel = !betResult
+                ? 'fallo'
+                : (loboApplied ? 'Lobo estepario' : 'acierto');
             breakdownHtml += `<div class="match-points-line">${betResult
-                ? `Apuesta: <strong>+${formatPoints(betPointsEarned)} pts</strong> (acierto)`
+                ? `Apuesta: <strong>+${formatPoints(betPointsEarned)} pts</strong> (${betLabel})`
                 : `Apuesta: <strong>${formatPoints(0)} pts</strong> (fallo)`}</div>`;
         } else {
             breakdownHtml += `<div class="match-points-line">Apuesta: <strong>${formatPoints(0)} pts</strong> (sin apuesta)</div>`;
         }
 
-        if (pichichiResult.hasFavorite) {
-            const pichDetail = pichichiBreakdownLines.length > 0
-                ? ` — ${pichichiBreakdownLines.join('; ')}`
-                : '';
-            breakdownHtml += `<div class="match-points-line">Pichichi: <strong>+${formatPoints(pichichiPointsEarned)} pts</strong>${pichDetail}</div>`;
+        if (loboApplied && betResult) {
+            breakdownHtml += `<div class="match-points-line">Lobo estepario: <strong>activo</strong> — único acierto de la porra</div>`;
+        }
+
+        if (favBreakdown.hasFavorite || favBreakdown.blockedByConsuelo) {
+            if (favBreakdown.blockedByConsuelo) {
+                breakdownHtml += `<div class="match-points-line">Pichichi / favorito: <strong>0.00 pts</strong> (consuelo desactivado)</div>`;
+            } else {
+                (favBreakdown.lines || []).forEach((line) => {
+                    if (line.key === 'matagigantes' && Number(line.points) === 0) {
+                        breakdownHtml += `<div class="match-points-line">${line.label}: <strong>${line.detail}</strong></div>`;
+                        return;
+                    }
+                    const pts = Number(line.points) || 0;
+                    const sign = pts > 0 ? '+' : '';
+                    breakdownHtml += `<div class="match-points-line">${line.label}: <strong>${sign}${formatPoints(pts)} pts</strong>${line.detail ? ` — ${line.detail}` : ''}</div>`;
+                });
+            }
         }
 
         matchPointsHtml = `
             <details class="match-points-details">
                 <summary class="match-points-summary">
-                    <span class="match-points-total">+${formatPoints(totalPoints)} pts en este partido</span>
+                    <span class="match-points-total">${totalPoints >= 0 ? '+' : ''}${formatPoints(totalPoints)} pts en este partido</span>
                     <span class="match-points-chevron">›</span>
                 </summary>
                 <div class="match-points-breakdown">${breakdownHtml}</div>

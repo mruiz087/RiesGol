@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="./css/styles.css?v=44">
+    <link rel="stylesheet" href="./css/styles.css?v=47">
 
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -178,8 +178,9 @@
 
                 <!-- TABLA 1: Clasificación general -->
                 <div class="ranking-container">
-                    <h3 class="ranking-section-title">🏆 Clasificación General</h3>
+                    <h3 class="ranking-section-title">Clasificación General</h3>
                     <p class="text-muted ranking-section-subtitle">Apuestas + Pichichi (total)</p>
+                    <div id="active-rules-chips" class="active-rules-chips"></div>
                     <table class="premium-table">
                         <thead>
                             <tr>
@@ -337,85 +338,106 @@
                     <p>Gestiona miembros y configuración de la porra</p>
                 </header>
 
-                <div class="glass-panel" style="max-width: 800px; margin: 0 auto; padding: 2rem;">
-                    <h3 style="margin-bottom: 1.5rem;">Estado del Torneo</h3>
-                    <form id="tournament-status-form">
-                        <div class="input-group">
-                            <span class="input-label">Estado</span>
-                            <div class="segmented-control" id="tournament-status-control" role="radiogroup" aria-label="Estado del torneo">
-                                <button type="button" class="segmented-control-btn" data-value="draft">Borrador</button>
-                                <button type="button" class="segmented-control-btn" data-value="active">Activo</button>
-                                <button type="button" class="segmented-control-btn" data-value="finished">Finalizado</button>
-                            </div>
-                            <input type="hidden" id="tournament-status" value="draft">
-                            <small style="color: var(--text-muted);">Estado actual del torneo de esta porra</small>
-                        </div>
-                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Actualizar Estado</button>
-                    </form>
-
-                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
-
-                    <h3 style="margin-bottom: 1.5rem;">Miembros</h3>
-                    <div id="group-members-container">
-                        <!-- JS inyectará la lista de miembros aquí -->
+                <div class="glass-panel admin-panel" style="max-width: 800px; margin: 0 auto; padding: 1.5rem;">
+                    <div class="admin-tabs" role="tablist" aria-label="Secciones de administración">
+                        <button type="button" class="admin-tab active" role="tab" aria-selected="true" data-admin-tab="general">General</button>
+                        <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="premios">Premios</button>
+                        <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="reglas">Reglas</button>
+                        <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="equipos">Equipos</button>
+                        <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="peligro">Peligro</button>
                     </div>
 
-                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div class="admin-tab-panels">
+                        <div class="admin-tab-panel active" data-admin-panel="general" role="tabpanel">
+                            <h3 class="admin-tab-heading">Estado del Torneo</h3>
+                            <form id="tournament-status-form">
+                                <div class="input-group">
+                                    <span class="input-label">Estado</span>
+                                    <div class="segmented-control" id="tournament-status-control" role="radiogroup" aria-label="Estado del torneo">
+                                        <button type="button" class="segmented-control-btn" data-value="draft">Borrador</button>
+                                        <button type="button" class="segmented-control-btn" data-value="active">Activo</button>
+                                        <button type="button" class="segmented-control-btn" data-value="finished">Finalizado</button>
+                                    </div>
+                                    <input type="hidden" id="tournament-status" value="draft">
+                                    <small style="color: var(--text-muted);">Estado actual del torneo de esta porra</small>
+                                </div>
+                                <button type="submit" class="btn-primary" style="margin-top: 1rem;">Actualizar Estado</button>
+                            </form>
 
-                    <h3 style="margin-bottom: 1.5rem;">Premio Especial</h3>
-                    <p class="text-muted" style="margin-bottom: 1rem;">
-                        Premio a quien ocupe la posición N en la clasificación general (apuestas + Pichichi).
-                        No añade puntos: solo destaca en el podio y en la tabla.
-                    </p>
-                    <form id="special-prize-form">
-                        <div class="input-group">
-                            <label class="toggle-switch" for="special-prize-enabled">
-                                <input type="checkbox" id="special-prize-enabled">
-                                <span class="toggle-slider" aria-hidden="true"></span>
-                                <span class="toggle-label">Activar premio especial</span>
-                            </label>
+                            <h3 class="admin-tab-heading" style="margin-top: 2rem;">Miembros</h3>
+                            <div id="group-members-container">
+                                <!-- JS inyectará la lista de miembros aquí -->
+                            </div>
                         </div>
-                        <div class="input-group" id="special-position-group" style="display: none;">
-                            <label for="special-position">Posición en clasificación</label>
-                            <select id="special-position" class="app-select" disabled>
-                                <option value="">Cargando…</option>
-                            </select>
-                            <small id="special-position-hint" style="color: var(--text-muted);">
-                                Debe existir al menos esa cantidad de jugadores en la porra.
-                            </small>
+
+                        <div class="admin-tab-panel" data-admin-panel="premios" role="tabpanel" hidden>
+                            <h3 class="admin-tab-heading">Premio Especial</h3>
+                            <p class="text-muted" style="margin-bottom: 1rem;">
+                                Premio a quien ocupe la posición N en la clasificación general (apuestas + Pichichi).
+                                No añade puntos: solo destaca en el podio y en la tabla.
+                            </p>
+                            <form id="special-prize-form">
+                                <div class="input-group">
+                                    <label class="toggle-switch" for="special-prize-enabled">
+                                        <input type="checkbox" id="special-prize-enabled">
+                                        <span class="toggle-slider" aria-hidden="true"></span>
+                                        <span class="toggle-label">Activar premio especial</span>
+                                    </label>
+                                </div>
+                                <div class="input-group" id="special-position-group" style="display: none;">
+                                    <label for="special-position">Posición en clasificación</label>
+                                    <select id="special-position" class="app-select" disabled>
+                                        <option value="">Cargando…</option>
+                                    </select>
+                                    <small id="special-position-hint" style="color: var(--text-muted);">
+                                        Debe existir al menos esa cantidad de jugadores en la porra.
+                                    </small>
+                                </div>
+                                <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar Configuración</button>
+                            </form>
                         </div>
-                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar Configuración</button>
-                    </form>
 
-                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div class="admin-tab-panel" data-admin-panel="reglas" role="tabpanel" hidden>
+                            <h3 class="admin-tab-heading">Reglas de puntuación</h3>
+                            <p class="text-muted" style="margin-bottom: 1rem;">
+                                Activa y configura los toggles de favorito y de la porra. Los marcados como
+                                <em>Próximamente</em> se guardan pero aún no afectan a los puntos.
+                            </p>
+                            <form id="scoring-rules-form" class="scoring-rules-form">
+                                <p class="text-muted">Cargando reglas…</p>
+                            </form>
+                        </div>
 
-                    <h3 style="margin-bottom: 1rem;">Puntos FIFA / Coeficientes</h3>
-                    <p style="color: var(--text-muted); margin-bottom: 1rem;">
-                        Asigna el <strong>valor</strong> y el <strong>bombo</strong> de cada equipo para esta porra.
-                        Los equipos se cargan automáticamente desde los partidos del torneo.
-                    </p>
-                    <form id="team-values-form">
-                        <div class="admin-sync-matches-row">
-                            <button type="button" class="btn-secondary btn-sm" id="sync-matches-btn">
-                                Sincronizar partidos
+                        <div class="admin-tab-panel" data-admin-panel="equipos" role="tabpanel" hidden>
+                            <h3 class="admin-tab-heading">Puntos FIFA / Coeficientes</h3>
+                            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                                Asigna el <strong>valor</strong> y el <strong>bombo</strong> de cada equipo para esta porra.
+                                Los equipos se cargan automáticamente desde los partidos del torneo.
+                            </p>
+                            <form id="team-values-form">
+                                <div class="admin-sync-matches-row">
+                                    <button type="button" class="btn-secondary btn-sm" id="sync-matches-btn">
+                                        Sincronizar partidos
+                                    </button>
+                                </div>
+                                <div id="team-values-editor">
+                                    <p class="text-muted">Cargando equipos…</p>
+                                </div>
+                                <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar configuración</button>
+                            </form>
+                        </div>
+
+                        <div class="admin-tab-panel" data-admin-panel="peligro" role="tabpanel" hidden>
+                            <h3 class="admin-tab-heading" style="color: var(--danger);">Zona peligrosa</h3>
+                            <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                                Como administrador puedes eliminar esta porra en cualquier momento.
+                                Se borrarán miembros, apuestas y selecciones asociadas.
+                            </p>
+                            <button id="delete-group-btn" class="btn-secondary" style="width: 100%; border-color: rgba(255,71,87,0.4);">
+                                Eliminar porra
                             </button>
                         </div>
-                        <div id="team-values-editor">
-                            <p class="text-muted">Cargando equipos…</p>
-                        </div>
-                        <button type="submit" class="btn-primary" style="margin-top: 1rem;">Guardar configuración</button>
-                    </form>
-
-                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
-
-                    <h3 style="margin-bottom: 1rem; color: var(--danger);">Zona peligrosa</h3>
-                    <p style="color: var(--text-muted); margin-bottom: 1rem;">
-                        Como administrador puedes eliminar esta porra en cualquier momento.
-                        Se borrarán miembros, apuestas y selecciones asociadas.
-                    </p>
-                    <button id="delete-group-btn" class="btn-secondary" style="width: 100%; border-color: rgba(255,71,87,0.4);">
-                        Eliminar porra
-                    </button>
+                    </div>
                 </div>
             </section>
 
@@ -424,16 +446,17 @@
 
     <!-- Scripts -->
     <script src="./js/supabase.js?v=39" defer></script>
-    <script src="./js/app.js?v=44" defer></script>
+    <script src="./js/app.js?v=47" defer></script>
     <script src="./js/auth.js" defer></script>
-    <script src="./js/api.js?v=43" defer></script>
+    <script src="./js/api.js?v=46" defer></script>
     <script src="./js/groups.js?v=44" defer></script>
-    <script src="./js/admin.js?v=43" defer></script>
+    <script src="./js/admin.js?v=47" defer></script>
     <script src="./js/pichichi-scoring.js?v=39" defer></script>
+    <script src="./js/scoring-rules.js?v=48" defer></script>
     <script src="./js/flags.js" defer></script>
-    <script src="./js/matches.js?v=39" defer></script>
-    <script src="./js/results.js?v=43" defer></script>
-    <script src="./js/scoring.js?v=45" defer></script>
+    <script src="./js/matches.js?v=48" defer></script>
+    <script src="./js/results.js?v=46" defer></script>
+    <script src="./js/scoring.js?v=46" defer></script>
     <script src="./js/pichichi.js?v=45" defer></script>
     <script src="./js/opciones.js" defer></script>
 </body>

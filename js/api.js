@@ -703,6 +703,61 @@ const API = {
         return { success: true, data };
     },
 
+    getScoringRules: async (groupId) => {
+        if (!window.supabaseClient || groupId == null) {
+            return window.ScoringRules?.getDefaultScoringRules?.() || {};
+        }
+        const { data, error } = await window.supabaseClient
+            .from('groups')
+            .select('scoring_rules')
+            .eq('id', groupId)
+            .maybeSingle();
+        if (error) {
+            console.warn('[getScoringRules]', error.message || error);
+            return window.ScoringRules?.getDefaultScoringRules?.() || {};
+        }
+        return window.ScoringRules?.normalizeScoringRules?.(data?.scoring_rules) || data?.scoring_rules || {};
+    },
+
+    updateScoringRules: async (groupId, rules) => {
+        if (!window.supabaseClient) return { success: false, error: 'Sin conexión' };
+        const gidNum = Number(groupId);
+        const payload = window.ScoringRules?.normalizeScoringRules?.(rules) || rules;
+
+        const publicClient = window.supabasePublicClient;
+        if (publicClient && Number.isFinite(gidNum)) {
+            const { data, error } = await publicClient.rpc('update_scoring_rules', {
+                p_group_id: gidNum,
+                p_rules: payload,
+            });
+            if (!error && data) {
+                return { success: true, data };
+            }
+            if (error) console.warn('[updateScoringRules] rpc:', error.message || error);
+        }
+
+        const { data, error } = await window.supabaseClient
+            .from('groups')
+            .update({ scoring_rules: payload })
+            .eq('id', groupId)
+            .select('id, scoring_rules')
+            .maybeSingle();
+
+        if (error) {
+            return {
+                success: false,
+                error: error.message || 'Error al guardar. Ejecuta docs/migrations/2026-07-20_group_scoring_rules.sql',
+            };
+        }
+        if (!data) {
+            return {
+                success: false,
+                error: 'No se pudo guardar. Ejecuta docs/migrations/2026-07-20_group_scoring_rules.sql en Supabase.',
+            };
+        }
+        return { success: true, data };
+    },
+
     // Actualizar estado de torneo
     updateTournamentStatus: async (tournamentId, status) => {
         if (!window.supabaseClient) return false;

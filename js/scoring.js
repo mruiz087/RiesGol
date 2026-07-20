@@ -42,6 +42,8 @@ window.loadRanking = async function() {
         if (!window.supabaseClient) return;
         if (!groupId) {
             resetPodiumAndTables('Selecciona una porra primero.');
+            const chipsEl = document.getElementById('active-rules-chips');
+            if (chipsEl) chipsEl.innerHTML = '';
             return;
         }
 
@@ -62,8 +64,14 @@ window.loadRanking = async function() {
         const tournamentId = window.Groups?.currentTournamentId;
         const { data: matches } = await window.supabaseClient
             .from('matches')
-            .select('id, fecha_inicio, equipo_local_id, equipo_visitante_id, equipo_local_nombre, equipo_visitante_nombre, goles_local, goles_visitante, fase, estado')
+            .select('id, fecha_inicio, equipo_local_id, equipo_visitante_id, equipo_local_nombre, equipo_visitante_nombre, goles_local, goles_visitante, goles_local_ft, goles_visitante_ft, fase, estado, duracion')
             .eq('tournament_id', tournamentId);
+
+        const scoringRules = await window.apiClient.getScoringRules(groupId);
+        const chipsEl = document.getElementById('active-rules-chips');
+        if (chipsEl && window.ScoringRules?.renderActiveRulesChipsHtml) {
+            chipsEl.innerHTML = window.ScoringRules.renderActiveRulesChipsHtml(scoringRules);
+        }
 
         // ─── Obtener apuestas del grupo (RPC + SELECT; todas las del grupo) ─
         const bets = await window.apiClient.getGroupBets(groupId);
@@ -156,12 +164,21 @@ window.loadRanking = async function() {
                 if (!window.PichichiScoring.isMatchFinished(match)) return;
 
                 const multiplier = phaseMultipliers[match.fase] || window.PichichiScoring.getPhaseMultiplier(match.fase) || 1;
-                const { pointsByUser } = window.PichichiScoring.calcBetPointsForMatch({
-                    match,
-                    bets,
-                    participantIds,
-                    multiplier,
-                });
+                const betCalc = window.ScoringRules?.calcBetPointsForMatchWithRules
+                    ? window.ScoringRules.calcBetPointsForMatchWithRules({
+                        match,
+                        bets,
+                        participantIds,
+                        multiplier,
+                        rules: scoringRules,
+                    })
+                    : window.PichichiScoring.calcBetPointsForMatch({
+                        match,
+                        bets,
+                        participantIds,
+                        multiplier,
+                    });
+                const { pointsByUser } = betCalc;
 
                 Object.entries(pointsByUser).forEach(([uid, pts]) => {
                     if (userPoints[uid]) {
@@ -216,10 +233,11 @@ window.loadRanking = async function() {
             });
         }
 
-        // ─── Calcular puntos Pichichi ───────────────────────────────────
+        // ─── Calcular puntos Pichichi (+ extras de reglas) ─────────────
         if (matches && favoriteSelections && groupValues?.length && window.PichichiScoring) {
             const fifaValues = Object.values(teamsFifaMap).map(Number).filter((v) => Number.isFinite(v) && v > 0);
             const maxFifaPoints = fifaValues.length > 0 ? Math.max(...fifaValues) : 1000;
+            const bomboByTeamId = window.ScoringRules?.buildBomboByTeamId?.(groupValues) || {};
 
             const selectionsByUser = {};
             favoriteSelections.forEach(selection => {
@@ -228,12 +246,42 @@ window.loadRanking = async function() {
                 selectionsByUser[userId].push(selection);
             });
 
+            const idKey = (id) => (id == null ? '' : String(id));
+            const betsByUserMatch = {};
+            (bets || []).forEach((b) => {
+                betsByUserMatch[`${idKey(b.user_id)}|${idKey(b.match_id)}`] =
+                    String(b.prediccion || '').trim().toUpperCase();
+            });
+
             Object.entries(selectionsByUser).forEach(([userId, selections]) => {
-                const { total } = window.PichichiScoring.calcUserPichichi(
-                    selections, matches, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap
-                );
+                let total = 0;
+                (matches || []).forEach((match) => {
+                    if (!window.PichichiScoring.isScoringMatch(match)) return;
+                    const pred = betsByUserMatch[`${userId}|${idKey(match.id)}`];
+                    const resultado = window.PichichiScoring.getMatchResult(match);
+                    const userBetCorrect = pred && resultado ? pred === resultado : (pred ? false : null);
+
+                    if (window.ScoringRules?.calcFavoriteMatchBreakdown) {
+                        const br = window.ScoringRules.calcFavoriteMatchBreakdown({
+                            match,
+                            selections,
+                            rules: scoringRules,
+                            maxFifaPoints,
+                            teamsFifaMap,
+                            teamsNameToId,
+                            aliasMap,
+                            bomboByTeamId,
+                            userBetCorrect,
+                        });
+                        total += Number(br.total) || 0;
+                    } else {
+                        const { total: t } = window.PichichiScoring.calcMatchPichichiForUser(
+                            match, selections, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap
+                        );
+                        total += Number(t) || 0;
+                    }
+                });
                 if (userPoints[userId]) {
-                    // Precisión completa; formatPoints redondea a 2 decimales solo al pintar
                     userPoints[userId].pichichiPoints = Number(total) || 0;
                 }
             });

@@ -175,6 +175,8 @@ async function syncOneTournament(
 
     let golesLocal: number | null = null;
     let golesVisitante: number | null = null;
+    let golesLocalFt: number | null = null;
+    let golesVisitanteFt: number | null = null;
     let penaltisLocal: number | null = null;
     let penaltisVisitante: number | null = null;
     let resultadoProrrogaGanador: string | null = null;
@@ -182,6 +184,11 @@ async function syncOneTournament(
     if (estado !== "pendiente") {
       const regularTime = scoreData.regularTime as { home?: number; away?: number } | undefined;
       const fullTime = scoreData.fullTime as { home?: number; away?: number } | undefined;
+
+      if (fullTime && fullTime.home != null && fullTime.away != null) {
+        golesLocalFt = fullTime.home ?? null;
+        golesVisitanteFt = fullTime.away ?? null;
+      }
 
       if (duration !== "REGULAR" && regularTime && regularTime.home !== null) {
         golesLocal = regularTime.home ?? null;
@@ -197,6 +204,8 @@ async function syncOneTournament(
       } else {
         golesLocal = fullTime?.home ?? null;
         golesVisitante = fullTime?.away ?? null;
+        if (golesLocalFt == null) golesLocalFt = golesLocal;
+        if (golesVisitanteFt == null) golesVisitanteFt = golesVisitante;
       }
 
       const penalties = scoreData.penalties as { home?: number; away?: number } | undefined;
@@ -222,6 +231,8 @@ async function syncOneTournament(
       fecha_inicio: item.utcDate,
       goles_local: golesLocal,
       goles_visitante: golesVisitante,
+      goles_local_ft: golesLocalFt,
+      goles_visitante_ft: golesVisitanteFt,
       estado,
       duracion: duration,
       penaltis_local: penaltisLocal,

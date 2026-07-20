@@ -25,6 +25,8 @@
     let cachedTeamsFifaMap = {};
     let cachedTeamsNameToId = {};
     let cachedAliasMap = {};
+    let cachedScoringRules = {};
+    let cachedBomboByTeamId = {};
     let interactionsBound = false;
 
     function matchKey(id) {
@@ -175,26 +177,64 @@
         const pred = getUserPrediction(match.id, userId);
         const classMap = { '1': 'result-home', X: 'result-draw', '2': 'result-away' };
         const PS = window.PichichiScoring;
+        const SR = window.ScoringRules;
         const multiplier = getPhaseConfig(match.fase || 'GROUP_STAGE').multiplier;
+        const rules = cachedScoringRules;
 
         let betPts = 0;
+        let betCorrect = null;
         if (pred) {
             const resultado = PS?.getMatchResult?.(match);
-            const acierto = resultado != null && pred === resultado;
-            if (acierto && PS?.calcBetPointsForMatch) {
-                const { pointsForUser } = PS.calcBetPointsForMatch({
-                    match,
-                    bets: cachedBets,
-                    participantIds: cachedParticipantIds,
-                    multiplier,
-                });
-                betPts = pointsForUser(userId) || 0;
+            betCorrect = resultado != null && pred === resultado;
+            if (betCorrect) {
+                const betCalc = SR?.calcBetPointsForMatchWithRules
+                    ? SR.calcBetPointsForMatchWithRules({
+                        match,
+                        bets: cachedBets,
+                        participantIds: cachedParticipantIds,
+                        multiplier,
+                        rules,
+                    })
+                    : PS?.calcBetPointsForMatch?.({
+                        match,
+                        bets: cachedBets,
+                        participantIds: cachedParticipantIds,
+                        multiplier,
+                    });
+                betPts = betCalc?.pointsForUser?.(userId) || 0;
+            } else {
+                betCorrect = false;
             }
         }
 
         const selections = cachedSelectionsByUser[String(userId)] || [];
+        let extrasHtml = '';
         let pichPts = 0;
-        if (PS?.calcMatchPichichiForUser && selections.length) {
+
+        if (SR?.calcFavoriteMatchBreakdown && selections.length) {
+            const br = SR.calcFavoriteMatchBreakdown({
+                match,
+                selections,
+                rules,
+                maxFifaPoints: cachedMaxFifa,
+                teamsFifaMap: cachedTeamsFifaMap,
+                teamsNameToId: cachedTeamsNameToId,
+                aliasMap: cachedAliasMap,
+                bomboByTeamId: cachedBomboByTeamId,
+                userBetCorrect: betCorrect,
+            });
+            pichPts = Number(br.total) || 0;
+            if (br.blockedByConsuelo) {
+                extrasHtml = '<p class="results-user-bet-line results-user-bet-extras">Favorito: 0 (consuelo off)</p>';
+            } else if (br.lines?.length) {
+                extrasHtml = `<div class="results-user-bet-extras">${br.lines.map((line) => {
+                    if (line.key === 'matagigantes' && !Number(line.points)) {
+                        return `<p class="results-user-bet-line">${line.label}: ${line.detail}</p>`;
+                    }
+                    return `<p class="results-user-bet-line">${line.label}: <strong>${SR.formatPts(line.points)}</strong></p>`;
+                }).join('')}</div>`;
+            }
+        } else if (PS?.calcMatchPichichiForUser && selections.length) {
             const { total } = PS.calcMatchPichichiForUser(
                 match,
                 selections,
@@ -218,6 +258,7 @@
                     <span class="results-user-bet-sep" aria-hidden="true">·</span>
                     <span>Pichichi <strong>+${formatPts(pichPts)}</strong></span>
                 </p>
+                ${extrasHtml}
             </div>
         `;
     }
@@ -501,6 +542,8 @@
         cachedTeamsFifaMap = {};
         cachedTeamsNameToId = {};
         cachedAliasMap = {};
+        cachedScoringRules = {};
+        cachedBomboByTeamId = {};
 
         window.showLoading();
         try {
@@ -528,7 +571,7 @@
                 return;
             }
 
-            const [members, rawBets, favRes, teamsCatalog, groupValues, aliases] = await Promise.all([
+            const [members, rawBets, favRes, teamsCatalog, groupValues, aliases, scoringRules] = await Promise.all([
                 loadMemberNames(groupId),
                 loadGroupBets(groupId),
                 window.supabaseClient
@@ -538,6 +581,7 @@
                 window.apiClient.getTeams(tournamentId),
                 window.apiClient.getGroupTeamValues(groupId),
                 window.PichichiScoring?.loadTeamAliases?.() || Promise.resolve([]),
+                window.apiClient.getScoringRules(groupId),
             ]);
 
             if (favRes.error) {
@@ -545,6 +589,8 @@
             }
 
             cachedMembers = members;
+            cachedScoringRules = scoringRules || {};
+            cachedBomboByTeamId = window.ScoringRules?.buildBomboByTeamId?.(groupValues) || {};
             const nameByUserId = {};
             cachedMembers.forEach(m => {
                 nameByUserId[String(m.user_id)] = m.name;
