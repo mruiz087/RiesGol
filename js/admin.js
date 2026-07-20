@@ -617,6 +617,277 @@ const Admin = {
         }
     },
 
+    csvEscape(value) {
+        if (value == null) return '';
+        const s = String(value);
+        if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+    },
+
+    toCsv(headers, rows) {
+        const lines = [headers.join(',')];
+        rows.forEach((row) => {
+            lines.push(headers.map((h) => Admin.csvEscape(row[h])).join(','));
+        });
+        return `\uFEFF${lines.join('\n')}`;
+    },
+
+    downloadBlob(filename, text) {
+        const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+    },
+
+    slugify(name) {
+        return String(name || 'porra')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9_-]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 40) || 'porra';
+    },
+
+    sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    },
+
+    updateExportButtonState() {
+        const btn = document.getElementById('admin-export-btn');
+        if (!btn) return;
+        const any = ['export-equipos', 'export-partidos', 'export-usuarios']
+            .some((id) => document.getElementById(id)?.checked);
+        btn.disabled = !any;
+    },
+
+    buildEquiposCsv(teams, groupValues) {
+        const byId = new Map((groupValues || []).map((gv) => [String(gv.team_id), gv]));
+        const translate = window.translateTeamName || ((n) => n);
+        const headers = ['Equipo', 'Bombo', 'Puntos_FIFA'];
+        const rows = (teams || [])
+            .slice()
+            .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
+            .map((t) => {
+                const gv = byId.get(String(t.id));
+                return {
+                    Equipo: translate(t.nombre || ''),
+                    Bombo: gv?.bombo ?? '',
+                    Puntos_FIFA: gv?.valor ?? '',
+                };
+            });
+        return Admin.toCsv(headers, rows);
+    },
+
+    phaseLabel(fase) {
+        const map = {
+            GROUP_STAGE: 'Fase de Grupos',
+            LAST_32: 'Dieciseisavos',
+            LAST_16: 'Octavos',
+            ROUND_OF_16: 'Octavos',
+            QUARTER_FINALS: 'Cuartos',
+            SEMI_FINALS: 'Semifinal',
+            FINAL: 'Final',
+            THIRD_PLACE: 'Tercer puesto',
+            THIRD_PLACE_MATCH: 'Tercer puesto',
+        };
+        const key = String(fase || 'GROUP_STAGE').toUpperCase().replace(/ /g, '_');
+        return map[key] || fase || '';
+    },
+
+    buildPartidosCsv(matches) {
+        const translate = window.translateTeamName || ((n) => n);
+        const PS = window.PichichiScoring;
+        const headers = [
+            'Fase', 'Equipo_local', 'Goles_local', 'Goles_visitante', 'Equipo_visitante', 'Resultado',
+        ];
+        const sorted = (matches || [])
+            .filter((m) => {
+                const f = m.fase || '';
+                return f !== 'THIRD_PLACE' && f !== 'THIRD_PLACE_MATCH';
+            })
+            .slice()
+            .sort((a, b) => {
+                const ta = new Date(a.fecha_inicio || 0).getTime();
+                const tb = new Date(b.fecha_inicio || 0).getTime();
+                return ta - tb;
+            });
+
+        const rows = sorted.map((m) => {
+            const res = PS?.getMatchResult?.(m);
+            return {
+                Fase: Admin.phaseLabel(m.fase),
+                Equipo_local: translate(m.equipo_local_nombre || ''),
+                Goles_local: m.goles_local ?? '',
+                Goles_visitante: m.goles_visitante ?? '',
+                Equipo_visitante: translate(m.equipo_visitante_nombre || ''),
+                Resultado: res || '',
+            };
+        });
+        return Admin.toCsv(headers, rows);
+    },
+
+    /**
+     * Matriz estilo captura: Equipo1 | Equipo2 | Res | Usuario1 | Usuario2 | …
+     * + bloque final de favoritos.
+     */
+    buildUsuariosCsv(members, bets, favorites, matches) {
+        const translate = window.translateTeamName || ((n) => n);
+        const PS = window.PichichiScoring;
+
+        const users = (members || [])
+            .map((m) => ({
+                id: String(m.user_id),
+                name: m.users?.name || m.name || 'Anónimo',
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+        const betByUserMatch = new Map();
+        (bets || []).forEach((b) => {
+            betByUserMatch.set(`${String(b.user_id)}|${String(b.match_id)}`, b);
+        });
+
+        const sortedMatches = (matches || [])
+            .filter((m) => {
+                const f = m.fase || '';
+                return f !== 'THIRD_PLACE' && f !== 'THIRD_PLACE_MATCH';
+            })
+            .slice()
+            .sort((a, b) => {
+                const ta = new Date(a.fecha_inicio || 0).getTime();
+                const tb = new Date(b.fecha_inicio || 0).getTime();
+                return ta - tb;
+            });
+
+        const headers = ['Equipo_1', 'Equipo_2', 'Res', ...users.map((u) => u.name)];
+        const rows = sortedMatches.map((m) => {
+            const res = PS?.getMatchResult?.(m) || '';
+            const row = {
+                Equipo_1: translate(m.equipo_local_nombre || ''),
+                Equipo_2: translate(m.equipo_visitante_nombre || ''),
+                Res: res,
+            };
+            users.forEach((u) => {
+                const bet = betByUserMatch.get(`${u.id}|${String(m.id)}`);
+                row[u.name] = bet?.prediccion ? String(bet.prediccion).trim().toUpperCase() : '';
+            });
+            return row;
+        });
+
+        let csv = Admin.toCsv(headers, rows);
+
+        // Bloque favoritos al final (como hoja de referencia)
+        const favHeaders = ['Usuario', 'Bombo', 'Equipo'];
+        const favRows = (favorites || [])
+            .slice()
+            .sort((a, b) => {
+                const na = users.find((u) => u.id === String(a.user_id))?.name || '';
+                const nb = users.find((u) => u.id === String(b.user_id))?.name || '';
+                if (na !== nb) return na.localeCompare(nb, 'es');
+                return String(a.bombo || '').localeCompare(String(b.bombo || ''));
+            })
+            .map((f) => ({
+                Usuario: users.find((u) => u.id === String(f.user_id))?.name || '',
+                Bombo: f.bombo || '',
+                Equipo: translate(f.teams?.nombre || ''),
+            }));
+
+        if (favRows.length) {
+            csv += `\n\nFAVORITOS\n${Admin.toCsv(favHeaders, favRows).replace(/^\uFEFF/, '')}`;
+        }
+
+        return csv;
+    },
+
+    exportSelectedCsvs: async () => {
+        const groupId = window.Groups?.currentGroupId;
+        const tournamentId = window.Groups?.currentTournamentId;
+        if (!groupId || !tournamentId) {
+            window.toast?.warning('Selecciona una porra primero.');
+            return;
+        }
+
+        const wantEquipos = !!document.getElementById('export-equipos')?.checked;
+        const wantPartidos = !!document.getElementById('export-partidos')?.checked;
+        const wantUsuarios = !!document.getElementById('export-usuarios')?.checked;
+        if (!wantEquipos && !wantPartidos && !wantUsuarios) {
+            window.toast?.warning('Selecciona al menos un fichero.');
+            return;
+        }
+
+        window.showLoading?.();
+        try {
+            let groupName = `porra_${groupId}`;
+            try {
+                const { data: g } = await window.supabaseClient
+                    .from('groups')
+                    .select('nombre')
+                    .eq('id', groupId)
+                    .maybeSingle();
+                if (g?.nombre) groupName = g.nombre;
+            } catch (_) { /* ignore */ }
+            const slug = Admin.slugify(groupName);
+
+            const downloads = [];
+
+            if (wantEquipos) {
+                const [teams, groupValues] = await Promise.all([
+                    window.apiClient.getTeams(tournamentId),
+                    window.apiClient.getGroupTeamValues(groupId),
+                ]);
+                downloads.push({
+                    name: `riesgol_${slug}_equipos.csv`,
+                    csv: Admin.buildEquiposCsv(teams, groupValues),
+                });
+            }
+
+            if (wantPartidos) {
+                const matches = await window.apiClient.getMatches(tournamentId, groupId);
+                downloads.push({
+                    name: `riesgol_${slug}_partidos.csv`,
+                    csv: Admin.buildPartidosCsv(matches),
+                });
+            }
+
+            if (wantUsuarios) {
+                const [members, bets, favRes, matches] = await Promise.all([
+                    window.apiClient.getGroupMembers(groupId),
+                    window.apiClient.getGroupBets(groupId),
+                    window.supabaseClient
+                        .from('favorite_selections')
+                        .select('user_id, team_id, bombo, teams(id, nombre)')
+                        .eq('group_id', groupId),
+                    window.apiClient.getMatches(tournamentId, groupId),
+                ]);
+                if (favRes.error) console.warn('[Export] favorites:', favRes.error);
+                downloads.push({
+                    name: `riesgol_${slug}_usuarios.csv`,
+                    csv: Admin.buildUsuariosCsv(members, bets, favRes.data || [], matches),
+                });
+            }
+
+            for (let i = 0; i < downloads.length; i++) {
+                Admin.downloadBlob(downloads[i].name, downloads[i].csv);
+                if (i < downloads.length - 1) await Admin.sleep(350);
+            }
+
+            window.toast?.success(
+                downloads.length === 1
+                    ? 'CSV descargado'
+                    : `${downloads.length} CSV descargados`
+            );
+        } catch (err) {
+            console.error('[Export]', err);
+            window.toast?.error('Error al exportar: ' + (err.message || 'revisa la consola'));
+        } finally {
+            window.hideLoading?.();
+        }
+    },
+
     switchAdminTab: (tabId) => {
         const root = document.getElementById('group-admin-view');
         if (!root || !tabId) return;
@@ -660,6 +931,9 @@ const Admin = {
         document.getElementById('team-values-form')?.addEventListener('submit', Admin.saveTeamValues);
         document.getElementById('scoring-rules-form')?.addEventListener('submit', Admin.saveScoringRulesConfig);
         document.getElementById('delete-group-btn')?.addEventListener('click', Admin.deleteCurrentGroup);
+        document.getElementById('admin-export-btn')?.addEventListener('click', () => Admin.exportSelectedCsvs());
+        document.getElementById('admin-export-options')?.addEventListener('change', () => Admin.updateExportButtonState());
+        Admin.updateExportButtonState();
 
         document.getElementById('sync-matches-btn')?.addEventListener('click', async () => {
             const tournamentId = window.Groups?.currentTournamentId;

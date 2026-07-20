@@ -208,7 +208,17 @@
     }) {
         const PS = window.PichichiScoring;
         const r = normalizeScoringRules(rules);
-        const empty = { total: 0, goalPoints: 0, extras: 0, lines: [], hasFavorite: false, blockedByConsuelo: false };
+        const empty = {
+            total: 0,
+            goalPoints: 0,
+            extras: 0,
+            pichichiPoints: 0,
+            rulesPoints: 0,
+            viaConsuelo: false,
+            lines: [],
+            hasFavorite: false,
+            blockedByConsuelo: false,
+        };
 
         if (!PS?.isScoringMatch?.(match) || !selections?.length) return empty;
 
@@ -318,7 +328,35 @@
         });
 
         const total = goalPoints + extras;
-        return { total, goalPoints, extras, lines, hasFavorite, blockedByConsuelo: false };
+        const viaConsuelo = userBetCorrect !== true;
+        // Apuesta fallida/ausente + consuelo: todo el favorito es "Regla". Acierto: goles = Pichichi, extras = Reglas.
+        const annotatedLines = lines.map((line) => {
+            if (viaConsuelo) {
+                if (line.key === 'goals') {
+                    return {
+                        ...line,
+                        category: 'regla',
+                        label: 'Consuelo (goles)',
+                        detail: `${line.detail || ''} · vía Consuelo`.trim(),
+                    };
+                }
+                return { ...line, category: 'regla' };
+            }
+            if (line.key === 'goals') return { ...line, category: 'pichichi' };
+            return { ...line, category: 'regla' };
+        });
+
+        return {
+            total,
+            goalPoints,
+            extras,
+            pichichiPoints: viaConsuelo ? 0 : goalPoints,
+            rulesPoints: viaConsuelo ? total : extras,
+            viaConsuelo,
+            lines: annotatedLines,
+            hasFavorite,
+            blockedByConsuelo: false,
+        };
     }
 
     function svgIcon(name) {

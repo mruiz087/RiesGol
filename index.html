@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="./css/styles.css?v=56">
+    <link rel="stylesheet" href="./css/styles.css?v=61">
 
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -369,6 +369,7 @@
                         <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="premios">Premios</button>
                         <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="reglas">Reglas</button>
                         <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="equipos">Equipos</button>
+                        <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="exportar">Exportar</button>
                         <button type="button" class="admin-tab" role="tab" aria-selected="false" data-admin-tab="peligro">Peligro</button>
                     </div>
 
@@ -452,6 +453,31 @@
                             </form>
                         </div>
 
+                        <div class="admin-tab-panel" data-admin-panel="exportar" role="tabpanel" hidden>
+                            <h3 class="admin-tab-heading">Exportar datos</h3>
+                            <p class="text-muted" style="margin-bottom: 1rem;">
+                                Descarga CSV de la <strong>porra seleccionada</strong> (y su torneo).
+                                Elige uno o varios ficheros.
+                            </p>
+                            <div class="admin-export-options" id="admin-export-options">
+                                <label class="admin-export-option">
+                                    <input type="checkbox" id="export-equipos" checked>
+                                    <span>Equipos y puntos FIFA</span>
+                                </label>
+                                <label class="admin-export-option">
+                                    <input type="checkbox" id="export-partidos" checked>
+                                    <span>Partidos (fase, equipos, goles, 1/X/2)</span>
+                                </label>
+                                <label class="admin-export-option">
+                                    <input type="checkbox" id="export-usuarios" checked>
+                                    <span>Apuestas (matriz Res + predicciones) y favoritos</span>
+                                </label>
+                            </div>
+                            <button type="button" class="btn-primary" id="admin-export-btn" style="margin-top: 1rem;">
+                                Descargar
+                            </button>
+                        </div>
+
                         <div class="admin-tab-panel" data-admin-panel="peligro" role="tabpanel" hidden>
                             <h3 class="admin-tab-heading" style="color: var(--danger);">Zona peligrosa</h3>
                             <p style="color: var(--text-muted); margin-bottom: 1rem;">
@@ -471,17 +497,17 @@
 
     <!-- Scripts -->
     <script src="./js/supabase.js?v=39" defer></script>
-    <script src="./js/app.js?v=56" defer></script>
+    <script src="./js/app.js?v=62" defer></script>
     <script src="./js/auth.js" defer></script>
     <script src="./js/api.js?v=46" defer></script>
     <script src="./js/groups.js?v=44" defer></script>
-    <script src="./js/admin.js?v=50" defer></script>
+    <script src="./js/admin.js?v=59" defer></script>
     <script src="./js/pichichi-scoring.js?v=39" defer></script>
-    <script src="./js/scoring-rules.js?v=55" defer></script>
+    <script src="./js/scoring-rules.js?v=58" defer></script>
     <script src="./js/avatars.js?v=53" defer></script>
     <script src="./js/flags.js" defer></script>
-    <script src="./js/matches.js?v=48" defer></script>
-    <script src="./js/results.js?v=55" defer></script>
+    <script src="./js/matches.js?v=61" defer></script>
+    <script src="./js/results.js?v=60" defer></script>
     <script src="./js/scoring.js?v=55" defer></script>
     <script src="./js/pichichi.js?v=45" defer></script>
     <script src="./js/opciones.js?v=56" defer></script>

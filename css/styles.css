@@ -681,6 +681,11 @@ h1, h2, h3, h4 {
     white-space: nowrap;
 }
 
+.phase-user-pts-value {
+    color: var(--success);
+    font-weight: 600;
+}
+
 .phase-multiplier {
     background: var(--primary);
     color: #000;
@@ -2398,6 +2403,30 @@ h1, h2, h3, h4 {
 .admin-tab-heading {
     margin: 0 0 1rem;
     font-size: 1.1rem;
+}
+
+.admin-export-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.admin-export-option {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    color: var(--text-main);
+}
+
+.admin-export-option input {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--primary, #2d6a4f);
 }
 
 @media (max-width: 768px) {

@@ -210,6 +210,7 @@
         const selections = cachedSelectionsByUser[String(userId)] || [];
         let extrasHtml = '';
         let pichPts = 0;
+        let rulesPts = 0;
 
         if (SR?.calcFavoriteMatchBreakdown && selections.length) {
             const br = SR.calcFavoriteMatchBreakdown({
@@ -223,19 +224,25 @@
                 bomboByTeamId: cachedBomboByTeamId,
                 userBetCorrect: betCorrect,
             });
-            pichPts = Number(br.total) || 0;
+            pichPts = Number(br.pichichiPoints) || 0;
+            rulesPts = Number(br.rulesPoints) || 0;
             if (br.blockedByConsuelo) {
                 extrasHtml = '<div class="results-user-bet-extras"><p class="results-user-bet-line">Favorito: 0 (consuelo off)</p></div>';
             } else if (br.lines?.length) {
-                extrasHtml = `<div class="results-user-bet-extras">
-                    <p class="results-user-bet-composition-label">Composición de reglas</p>
-                    ${br.lines.map((line) => {
-                        if (line.key === 'matagigantes' && !Number(line.points)) {
-                            return `<p class="results-user-bet-line">${line.label}: ${line.detail}</p>`;
-                        }
-                        return `<p class="results-user-bet-line">${line.label}: <strong>${SR.formatPts(line.points)}</strong></p>`;
-                    }).join('')}
-                </div>`;
+                const linesForRules = br.viaConsuelo
+                    ? br.lines
+                    : br.lines.filter((line) => line.category === 'regla');
+                if (linesForRules.length) {
+                    extrasHtml = `<div class="results-user-bet-extras">
+                        <p class="results-user-bet-composition-label">Composición de reglas</p>
+                        ${linesForRules.map((line) => {
+                            if (line.key === 'matagigantes' && !Number(line.points)) {
+                                return `<p class="results-user-bet-line">${line.label}: ${line.detail}</p>`;
+                            }
+                            return `<p class="results-user-bet-line">${line.label}: <strong>${SR.formatPts(line.points)}</strong></p>`;
+                        }).join('')}
+                    </div>`;
+                }
             }
         } else if (PS?.calcMatchPichichiForUser && selections.length) {
             const { total } = PS.calcMatchPichichiForUser(
@@ -246,7 +253,8 @@
                 cachedTeamsNameToId,
                 cachedAliasMap
             );
-            pichPts = Number(total) || 0;
+            pichPts = betCorrect === true ? (Number(total) || 0) : 0;
+            rulesPts = betCorrect !== true ? (Number(total) || 0) : 0;
         }
 
         const betLine = pred
@@ -259,7 +267,9 @@
                 <p class="results-user-bet-line results-user-bet-points">
                     <span>Aciertos <strong>+${formatPts(betPts)}</strong></span>
                     <span class="results-user-bet-sep" aria-hidden="true">·</span>
-                    <span>Reglas <strong>+${formatPts(pichPts)}</strong></span>
+                    <span>Pichichi <strong>+${formatPts(pichPts)}</strong></span>
+                    <span class="results-user-bet-sep" aria-hidden="true">·</span>
+                    <span>Reglas <strong>+${formatPts(rulesPts)}</strong></span>
                 </p>
                 ${extrasHtml}
             </div>

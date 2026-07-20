@@ -199,7 +199,8 @@ window.loadMatches = async function() {
         function calcPhaseUserPoints(faseMatches, multiplier) {
             let betPts = 0;
             let pichPts = 0;
-            if (!PS || !currentUserId) return { betPts, pichPts };
+            let rulesPts = 0;
+            if (!PS || !currentUserId) return { betPts, pichPts, rulesPts };
             const SR = window.ScoringRules;
 
             faseMatches.forEach((match) => {
@@ -243,7 +244,8 @@ window.loadMatches = async function() {
                         bomboByTeamId,
                         userBetCorrect,
                     });
-                    pichPts += Number(br.total) || 0;
+                    pichPts += Number(br.pichichiPoints) || 0;
+                    rulesPts += Number(br.rulesPoints) || 0;
                 } else if (PS.calcMatchPichichiForUser) {
                     const { total } = PS.calcMatchPichichiForUser(
                         match,
@@ -253,18 +255,19 @@ window.loadMatches = async function() {
                         teamsNameToId,
                         aliasMap
                     );
-                    pichPts += Number(total) || 0;
+                    if (userBetCorrect === true) pichPts += Number(total) || 0;
+                    else rulesPts += Number(total) || 0;
                 }
             });
 
-            return { betPts: round2(betPts), pichPts: round2(pichPts) };
+            return { betPts: round2(betPts), pichPts: round2(pichPts), rulesPts: round2(rulesPts) };
         }
 
         // Renderizar cada fase como sección desplegable
         phaseOrder.forEach(fase => {
             const config = getPhaseConfig(fase);
             const isOpen = fase === defaultOpenPhase;
-            const { betPts, pichPts } = calcPhaseUserPoints(phaseGroups[fase], config.multiplier);
+            const { betPts, pichPts, rulesPts } = calcPhaseUserPoints(phaseGroups[fase], config.multiplier);
 
             const section = document.createElement('details');
             section.className = 'phase-section';
@@ -273,7 +276,7 @@ window.loadMatches = async function() {
             section.innerHTML = `
                 <summary class="phase-summary">
                     <span class="phase-label">${config.label}</span>
-                    <span class="phase-user-points">Aciertos ${formatPoints(betPts)} · Pichichi ${formatPoints(pichPts)}</span>
+                    <span class="phase-user-points">Aciertos <span class="phase-user-pts-value">${formatPoints(betPts)}</span> · Pichichi <span class="phase-user-pts-value">${formatPoints(pichPts)}</span> · Reglas <span class="phase-user-pts-value">${formatPoints(rulesPts)}</span></span>
                     <span class="phase-multiplier">✕${config.multiplier} puntos</span>
                     <span class="phase-count">${phaseGroups[fase].length} partidos</span>
                     <span class="phase-chevron">›</span>
@@ -356,7 +359,7 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
             ? betResult === true
             : null;
 
-        let favBreakdown = { total: 0, lines: [], hasFavorite: false, blockedByConsuelo: false };
+        let favBreakdown = { total: 0, lines: [], hasFavorite: false, blockedByConsuelo: false, pichichiPoints: 0, rulesPoints: 0, viaConsuelo: false };
         if (SR?.calcFavoriteMatchBreakdown) {
             favBreakdown = SR.calcFavoriteMatchBreakdown({
                 match,
@@ -373,11 +376,16 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
         } else {
             const pichichiResult = PS.calcMatchPichichiForUser(match, userPichichiSelections, maxFifaPoints, teamsFifaMap, teamsNameToId, aliasMap);
             pichichiPointsEarned = pichichiResult.total;
+            const viaConsuelo = userBetCorrect !== true;
             favBreakdown = {
                 total: pichichiResult.total,
+                pichichiPoints: viaConsuelo ? 0 : pichichiResult.total,
+                rulesPoints: viaConsuelo ? pichichiResult.total : 0,
+                viaConsuelo,
                 lines: pichichiResult.breakdown.map(b => ({
                     key: 'goals',
-                    label: 'Pichichi',
+                    category: viaConsuelo ? 'regla' : 'pichichi',
+                    label: viaConsuelo ? 'Consuelo (goles)' : 'Goles Pichichi',
                     points: b.points,
                     detail: `${b.teamName}: ${b.goals} gol(es)`,
                 })),
@@ -385,6 +393,7 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
             };
         }
 
+        const pichichiOnly = Number(favBreakdown.pichichiPoints) || 0;
         const totalPoints = betPointsEarned + pichichiPointsEarned;
 
         let breakdownHtml = '';
@@ -393,25 +402,31 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
                 ? 'fallo'
                 : (loboApplied ? 'Lobo estepario' : 'acierto');
             breakdownHtml += `<div class="match-points-line">${betResult
-                ? `Apuesta: <strong>+${formatPoints(betPointsEarned)} pts</strong> (${betLabel})`
-                : `Apuesta: <strong>${formatPoints(0)} pts</strong> (fallo)`}</div>`;
+                ? `Aciertos: <strong>+${formatPoints(betPointsEarned)} pts</strong> (${betLabel})`
+                : `Aciertos: <strong>${formatPoints(0)} pts</strong> (fallo)`}</div>`;
         } else {
-            breakdownHtml += `<div class="match-points-line">Apuesta: <strong>${formatPoints(0)} pts</strong> (sin apuesta)</div>`;
+            breakdownHtml += `<div class="match-points-line">Aciertos: <strong>${formatPoints(0)} pts</strong> (sin apuesta)</div>`;
         }
 
         if (loboApplied && betResult) {
             breakdownHtml += `<div class="match-points-line">Lobo estepario: <strong>activo</strong> — único acierto de la porra</div>`;
         }
 
+        if (pichichiOnly !== 0 || (favBreakdown.hasFavorite && !favBreakdown.viaConsuelo && !favBreakdown.blockedByConsuelo)) {
+            breakdownHtml += `<div class="match-points-line">Pichichi: <strong>+${formatPoints(pichichiOnly)} pts</strong></div>`;
+        }
+
         if (favBreakdown.hasFavorite || favBreakdown.blockedByConsuelo) {
             if (favBreakdown.blockedByConsuelo) {
-                breakdownHtml += `<div class="match-points-line">Pichichi / favorito: <strong>0.00 pts</strong> (consuelo desactivado)</div>`;
+                breakdownHtml += `<div class="match-points-line">Favorito: <strong>0.00 pts</strong> (consuelo desactivado)</div>`;
             } else {
-                (favBreakdown.lines || []).forEach((line) => {
-                    if (line.key === 'matagigantes' && Number(line.points) === 0) {
-                        breakdownHtml += `<div class="match-points-line">${line.label}: <strong>${line.detail}</strong></div>`;
-                        return;
-                    }
+                // Solo líneas de regla que puntúan (o Consuelo); sin total genérico "Reglas"
+                const ruleLines = (favBreakdown.lines || []).filter((l) => {
+                    if (l.key === 'matagigantes' && !Number(l.points)) return false;
+                    if (favBreakdown.viaConsuelo) return l.category === 'regla';
+                    return l.category === 'regla' && l.key !== 'goals';
+                });
+                ruleLines.forEach((line) => {
                     const pts = Number(line.points) || 0;
                     const sign = pts > 0 ? '+' : '';
                     breakdownHtml += `<div class="match-points-line">${line.label}: <strong>${sign}${formatPoints(pts)} pts</strong>${line.detail ? ` — ${line.detail}` : ''}</div>`;
