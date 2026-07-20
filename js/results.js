@@ -298,7 +298,7 @@
         return `
             <div class="results-filter-bar">
                 <label class="results-filter-label" for="results-user-filter">Ver apuestas de</label>
-                <select id="results-user-filter" class="results-user-filter">
+                                <select id="results-user-filter" class="app-select results-user-filter">
                     <option value=""${!selectedUserId ? ' selected' : ''}>Todos</option>
                     ${options}
                 </select>

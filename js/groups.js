@@ -215,7 +215,7 @@ const Groups = {
         });
     },
 
-    // Seleccionar una porra: pichichi primero si aún no está guardado
+    // Seleccionar una porra: miembros sin pichichi → pichichi; admin → clasificación
     selectGroup: async (groupId, tournamentId) => {
         Groups.currentGroupId = groupId;
         Groups.currentTournamentId = tournamentId;
@@ -224,12 +224,25 @@ const Groups = {
         localStorage.setItem('currentGroupId', groupId);
         localStorage.setItem('currentTournamentId', tournamentId);
 
+        window.closeMobileNav?.();
+
         if (window.Admin) {
-            window.Admin.updateAdminLinkVisibility();
+            await window.Admin.updateAdminLinkVisibility();
+        }
+
+        const userId = window.getCurrentUser?.()?.id || window.currentUser?.id;
+        const isAdmin = !!(window.Admin?.isAdmin && userId
+            && await window.Admin.isAdmin(groupId, userId));
+
+        if (isAdmin) {
+            await window.navigateTo('dashboard-view');
+            window.closeMobileNav?.();
+            return;
         }
 
         const hasPichichi = await Groups.userHasPichichi();
-        window.navigateTo(hasPichichi ? 'dashboard-view' : 'pichichi-view');
+        await window.navigateTo(hasPichichi ? 'dashboard-view' : 'pichichi-view');
+        window.closeMobileNav?.();
     },
 
     // Volver al listado de porras (salir del contexto de porra activa)

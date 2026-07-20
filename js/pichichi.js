@@ -299,9 +299,29 @@ async function savePichichiSelections() {
 
     window.showLoading();
     try {
-        const { error } = await window.supabaseClient
+        let error = null;
+
+        const upsertRes = await window.supabaseClient
             .from('favorite_selections')
             .upsert(upsertData, { onConflict: 'group_id,user_id,bombo' });
+        error = upsertRes.error;
+
+        // Fallback: delete + insert (UNIQUE viejo user_id+bombo o onConflict mal alineado)
+        if (error) {
+            console.warn('[Pichichi] upsert falló, intentando delete+insert:', error);
+            const { error: delError } = await window.supabaseClient
+                .from('favorite_selections')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('group_id', groupId);
+
+            if (delError) throw delError;
+
+            const { error: insError } = await window.supabaseClient
+                .from('favorite_selections')
+                .insert(upsertData);
+            error = insError;
+        }
 
         if (error) throw error;
 
@@ -314,7 +334,16 @@ async function savePichichiSelections() {
 
     } catch (error) {
         console.error("Error guardando pichichi:", error);
-        window.toast?.error("Error al guardar. Revisa tu conexión.");
+        const code = error?.code || error?.details || '';
+        const msg = error?.message || String(error);
+        const isDup = code === '23505' || /duplicate key|unique constraint/i.test(msg);
+        if (isDup) {
+            window.toast?.error(
+                'Conflicto UNIQUE al guardar Pichichi. Ejecuta en Supabase: docs/migrations/2026-07-20_favorite_selections_unique_fix.sql'
+            );
+        } else {
+            window.toast?.error(msg || 'Error al guardar. Revisa tu conexión.');
+        }
     } finally {
         window.hideLoading();
     }

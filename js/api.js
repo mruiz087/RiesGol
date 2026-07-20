@@ -622,32 +622,81 @@ const API = {
         return { success: true };
     },
 
-    // Actualizar premio especial del grupo
+    // Actualizar premio especial del grupo (RPC admin + fallback UPDATE)
     updateSpecialPrize: async (groupId, enabled, position) => {
-        if (!window.supabaseClient) return false;
+        if (!window.supabaseClient) return { success: false, error: 'Sin conexión' };
 
+        const gidNum = Number(groupId);
+        const gid = Number.isFinite(gidNum) ? gidNum : groupId;
         const payload = {
             special_prize_enabled: !!enabled,
             special_position: enabled ? Number(position) : null
         };
 
+        const normalizeRpc = (data) => {
+            if (data == null) return null;
+            if (typeof data === 'string') {
+                try { return JSON.parse(data); } catch (_) { return null; }
+            }
+            return data;
+        };
+
+        // 1) RPC public (migración 2026-07-20)
+        const publicClient = window.supabasePublicClient;
+        if (publicClient && Number.isFinite(gidNum)) {
+            const { data, error } = await publicClient.rpc('update_special_prize', {
+                p_group_id: gidNum,
+                p_enabled: !!enabled,
+                p_position: enabled ? Number(position) : null,
+            });
+            if (!error) {
+                const row = normalizeRpc(data);
+                if (row && (row.id != null || row.special_prize_enabled != null)) {
+                    return { success: true, data: row };
+                }
+            } else {
+                console.warn('[updateSpecialPrize] public.rpc:', error.message || error);
+            }
+        }
+
+        // 2) RPC porra
+        if (Number.isFinite(gidNum)) {
+            const { data, error } = await window.supabaseClient.rpc('update_special_prize', {
+                p_group_id: gidNum,
+                p_enabled: !!enabled,
+                p_position: enabled ? Number(position) : null,
+            });
+            if (!error) {
+                const row = normalizeRpc(data);
+                if (row && (row.id != null || row.special_prize_enabled != null)) {
+                    return { success: true, data: row };
+                }
+            } else {
+                console.warn('[updateSpecialPrize] porra.rpc:', error.message || error);
+            }
+        }
+
+        // 3) UPDATE directo
         const { data, error } = await window.supabaseClient
             .from('groups')
             .update(payload)
-            .eq('id', groupId)
+            .eq('id', gid)
             .select('id, special_prize_enabled, special_position')
             .maybeSingle();
 
         if (error) {
             console.error('Error actualizando premio especial:', error);
-            return { success: false, error: error.message };
+            return {
+                success: false,
+                error: error.message || 'Error al guardar. Ejecuta docs/migrations/2026-07-20_groups_special_prize_rls.sql',
+            };
         }
 
         if (!data) {
             console.error('Premio especial: update sin filas (¿RLS o groupId incorrecto?)', { groupId, payload });
             return {
                 success: false,
-                error: 'No se pudo guardar. Comprueba que eres admin de esta porra (permisos RLS).'
+                error: 'No se pudo guardar. Ejecuta en Supabase: docs/migrations/2026-07-20_groups_special_prize_rls.sql',
             };
         }
 

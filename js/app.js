@@ -100,22 +100,34 @@ function initApp() {
             if (targetId) {
                 navigateTo(targetId);
             }
-
-            const navUl = document.querySelector('.nav-links');
-            if (navUl.classList.contains('show')) {
-                navUl.classList.remove('show');
-            }
         });
     });
 
     // Menú móvil
     const mobileBtn = document.querySelector('.mobile-menu-btn');
     if (mobileBtn) {
+        mobileBtn.setAttribute('aria-expanded', 'false');
         mobileBtn.addEventListener('click', () => {
-            document.querySelector('.nav-links').classList.toggle('show');
+            const navUl = document.querySelector('.nav-links');
+            if (!navUl) return;
+            const open = navUl.classList.toggle('show');
+            mobileBtn.setAttribute('aria-expanded', String(open));
         });
     }
 }
+
+function closeMobileNav() {
+    const navUl = document.querySelector('.nav-links');
+    if (navUl) {
+        navUl.classList.remove('show');
+    }
+    const mobileBtn = document.querySelector('.mobile-menu-btn');
+    if (mobileBtn) {
+        mobileBtn.setAttribute('aria-expanded', 'false');
+    }
+}
+
+window.closeMobileNav = closeMobileNav;
 
 const PICHICHI_GATED_VIEWS = new Set([
     'dashboard-view',
@@ -124,8 +136,21 @@ const PICHICHI_GATED_VIEWS = new Set([
     'group-admin-view',
 ]);
 
+async function isCurrentUserGroupAdmin() {
+    const groupId = window.Groups?.currentGroupId;
+    const userId = window.getCurrentUser?.()?.id || window.currentUser?.id;
+    if (!groupId || !userId || !window.Admin?.isAdmin) return false;
+    try {
+        return !!(await window.Admin.isAdmin(groupId, userId));
+    } catch (_) {
+        return false;
+    }
+}
+
 // Función para cambiar de vista (SPA)
 window.navigateTo = async function(viewId, options = {}) {
+    closeMobileNav();
+
     let resolvedViewId = viewId;
 
     if (
@@ -133,11 +158,14 @@ window.navigateTo = async function(viewId, options = {}) {
         && window.Groups?.currentGroupId
         && typeof window.Groups.userHasPichichi === 'function'
     ) {
-        const hasPichichi = await window.Groups.userHasPichichi();
-        if (!hasPichichi) {
-            resolvedViewId = 'pichichi-view';
-            if (viewId !== 'pichichi-view') {
-                window.toast?.warning('Primero debes elegir tus equipos pichichi.');
+        const isAdmin = await isCurrentUserGroupAdmin();
+        if (!isAdmin) {
+            const hasPichichi = await window.Groups.userHasPichichi();
+            if (!hasPichichi) {
+                resolvedViewId = 'pichichi-view';
+                if (viewId !== 'pichichi-view') {
+                    window.toast?.warning('Primero debes elegir tus equipos pichichi.');
+                }
             }
         }
     }
@@ -178,9 +206,13 @@ window.navigateTo = async function(viewId, options = {}) {
         setActiveNavLink(resolvedViewId);
 
         if (window.Admin) {
-            window.Admin.updateAdminLinkVisibility();
+            await window.Admin.updateAdminLinkVisibility();
         }
     }
+
+    // Tras actualizar items del menú (entrar en porra → Clasificación), forzar colapso
+    closeMobileNav();
+    requestAnimationFrame(closeMobileNav);
 }
 
 function setActiveNavLink(viewId) {

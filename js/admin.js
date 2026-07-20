@@ -93,17 +93,17 @@ const Admin = {
 
         if (group) {
             const enabled = group.special_prize_enabled || false;
-            document.getElementById('special-prize-enabled').checked = enabled;
-            document.getElementById('special-position').value = group.special_position || '';
+            const enabledEl = document.getElementById('special-prize-enabled');
+            if (enabledEl) enabledEl.checked = enabled;
             document.getElementById('special-position-group').style.display = enabled ? 'block' : 'none';
-            await Admin.updateSpecialPositionHint();
+            await Admin.populateSpecialPositionSelect(group.special_position || null);
         }
     },
 
-    updateSpecialPositionHint: async () => {
+    populateSpecialPositionSelect: async (selectedPosition = null) => {
+        const select = document.getElementById('special-position');
         const hint = document.getElementById('special-position-hint');
-        const input = document.getElementById('special-position');
-        if (!hint) return;
+        if (!select) return;
 
         const groupId = window.Groups?.currentGroupId;
         let memberCount = 0;
@@ -112,13 +112,46 @@ const Admin = {
             memberCount = members?.length || 0;
         }
 
-        if (input && memberCount > 0) {
-            input.max = String(memberCount);
+        const current = selectedPosition != null && selectedPosition !== ''
+            ? Number(selectedPosition)
+            : Number(select.value) || null;
+
+        select.innerHTML = '';
+        if (memberCount === 0) {
+            select.disabled = true;
+            select.innerHTML = '<option value="">Sin jugadores</option>';
+            if (hint) {
+                hint.textContent = 'Añade jugadores a la porra antes de elegir la posición.';
+            }
+            return;
         }
 
-        hint.textContent = memberCount > 0
-            ? `Hay ${memberCount} jugador${memberCount !== 1 ? 'es' : ''} en la porra. La posición debe estar entre 1 y ${memberCount}.`
-            : 'Debe existir al menos esa cantidad de jugadores en la porra.';
+        select.disabled = false;
+        for (let i = 1; i <= memberCount; i++) {
+            const opt = document.createElement('option');
+            opt.value = String(i);
+            opt.textContent = `${i}º`;
+            select.appendChild(opt);
+        }
+
+        const pick = Number.isFinite(current) && current >= 1 && current <= memberCount
+            ? current
+            : Math.min(3, memberCount);
+        select.value = String(pick);
+
+        if (hint) {
+            const tip = pick === 1 || pick === 2
+                ? ' Nota: 1º y 2º ya aparecen en el podio principal.'
+                : '';
+            hint.textContent =
+                `Hay ${memberCount} jugador${memberCount !== 1 ? 'es' : ''} en la porra. Elige la posición del premio especial (1–${memberCount}).${tip}`;
+        }
+    },
+
+    updateSpecialPositionHint: async () => {
+        const select = document.getElementById('special-position');
+        const selected = select?.value ? Number(select.value) : null;
+        await Admin.populateSpecialPositionSelect(selected);
     },
 
     setSegmentedControlValue: (value) => {
@@ -161,7 +194,7 @@ const Admin = {
 
         if (enabled) {
             if (!Number.isFinite(position) || position < 1) {
-                window.toast?.warning('Ingresa una posición válida (mínimo 1)');
+                window.toast?.warning('Elige una posición válida');
                 return;
             }
 
@@ -179,13 +212,6 @@ const Admin = {
                 );
                 return;
             }
-
-            if (position === 1 || position === 2) {
-                const ok = confirm(
-                    `La posición ${position}º ya aparece en el podio principal (1º/2º). ¿Quieres usarla también como premio especial?`
-                );
-                if (!ok) return;
-            }
         }
 
         const result = await window.apiClient.updateSpecialPrize(groupId, enabled, position);
@@ -195,6 +221,7 @@ const Admin = {
             } else {
                 window.toast?.success('Premio especial desactivado');
             }
+            await Admin.loadSpecialPrizeConfig();
         } else {
             window.toast?.error(result?.error || 'Error al guardar configuración');
         }
@@ -551,8 +578,12 @@ const Admin = {
         document.getElementById('special-prize-enabled')?.addEventListener('change', async (e) => {
             document.getElementById('special-position-group').style.display = e.target.checked ? 'block' : 'none';
             if (e.target.checked) {
-                await Admin.updateSpecialPositionHint();
+                await Admin.populateSpecialPositionSelect();
             }
+        });
+
+        document.getElementById('special-position')?.addEventListener('change', async () => {
+            await Admin.updateSpecialPositionHint();
         });
 
         document.getElementById('special-prize-form')?.addEventListener('submit', Admin.saveSpecialPrizeConfig);

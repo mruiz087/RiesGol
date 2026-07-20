@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="./css/styles.css?v=42">
+    <link rel="stylesheet" href="./css/styles.css?v=44">
 
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -377,7 +377,9 @@
                         </div>
                         <div class="input-group" id="special-position-group" style="display: none;">
                             <label for="special-position">Posición en clasificación</label>
-                            <input type="number" id="special-position" min="1" placeholder="Ej: 3">
+                            <select id="special-position" class="app-select" disabled>
+                                <option value="">Cargando…</option>
+                            </select>
                             <small id="special-position-hint" style="color: var(--text-muted);">
                                 Debe existir al menos esa cantidad de jugadores en la porra.
                             </small>
@@ -422,17 +424,17 @@
 
     <!-- Scripts -->
     <script src="./js/supabase.js?v=39" defer></script>
-    <script src="./js/app.js?v=40" defer></script>
+    <script src="./js/app.js?v=44" defer></script>
     <script src="./js/auth.js" defer></script>
-    <script src="./js/api.js?v=39" defer></script>
-    <script src="./js/groups.js" defer></script>
-    <script src="./js/admin.js?v=39" defer></script>
+    <script src="./js/api.js?v=43" defer></script>
+    <script src="./js/groups.js?v=44" defer></script>
+    <script src="./js/admin.js?v=43" defer></script>
     <script src="./js/pichichi-scoring.js?v=39" defer></script>
     <script src="./js/flags.js" defer></script>
     <script src="./js/matches.js?v=39" defer></script>
-    <script src="./js/results.js?v=42" defer></script>
-    <script src="./js/scoring.js?v=39" defer></script>
-    <script src="./js/pichichi.js" defer></script>
+    <script src="./js/results.js?v=43" defer></script>
+    <script src="./js/scoring.js?v=45" defer></script>
+    <script src="./js/pichichi.js?v=45" defer></script>
     <script src="./js/opciones.js" defer></script>
 </body>
 </html>

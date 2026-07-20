@@ -1,6 +1,36 @@
 // js/scoring.js
 // Lógica para cargar y mostrar la clasificación y el podio (calculada dinámicamente por grupo)
 
+function resetPodiumUi() {
+    const setText = (id, text) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    };
+
+    setText('podium-name-1', '--');
+    setText('podium-pts-1', '0 pts');
+    setText('podium-name-2', '--');
+    setText('podium-pts-2', '0 pts');
+    setText('podium-name-last', '--');
+
+    const podiumStepSpecial = document.getElementById('podium-step-special');
+    if (podiumStepSpecial) podiumStepSpecial.style.display = 'none';
+    setText('podium-name-special', '--');
+    setText('podium-name-13', '--');
+    setText('podium-pts-special', '0 pts');
+    setText('podium-pts-13', '0 pts');
+    setText('podium-label-special', 'Especial');
+}
+
+function resetPodiumAndTables(message) {
+    resetPodiumUi();
+    const row = `<tr><td colspan="3" class="text-center">${message}</td></tr>`;
+    const rankingBody = document.getElementById('ranking-body');
+    const pichichiBody = document.getElementById('pichichi-ranking-body');
+    if (rankingBody) rankingBody.innerHTML = row;
+    if (pichichiBody) pichichiBody.innerHTML = row;
+}
+
 window.loadRanking = async function() {
     window.showLoading();
     try {
@@ -11,8 +41,7 @@ window.loadRanking = async function() {
         
         if (!window.supabaseClient) return;
         if (!groupId) {
-            document.getElementById('ranking-body').innerHTML = '<tr><td colspan="3" class="text-center">Selecciona una porra primero.</td></tr>';
-            document.getElementById('pichichi-ranking-body').innerHTML = '<tr><td colspan="3" class="text-center">Selecciona una porra primero.</td></tr>';
+            resetPodiumAndTables('Selecciona una porra primero.');
             return;
         }
 
@@ -25,8 +54,7 @@ window.loadRanking = async function() {
         if (membersError) throw membersError;
 
         if (!members || members.length === 0) {
-            document.getElementById('ranking-body').innerHTML = '<tr><td colspan="3" class="text-center">No hay miembros en esta porra.</td></tr>';
-            document.getElementById('pichichi-ranking-body').innerHTML = '<tr><td colspan="3" class="text-center">No hay miembros en esta porra.</td></tr>';
+            resetPodiumAndTables('No hay miembros en esta porra.');
             return;
         }
 
@@ -78,17 +106,14 @@ window.loadRanking = async function() {
             ? Number(groupConfig.special_position)
             : null;
 
-        // Solo cuentan quienes ya guardaron pichichi (favorite_selections)
+        // Solo cuentan quienes ya guardaron pichichi (favorite_selections) en ESTA porra
         const usersWithPichichi = new Set(
-            (favoriteSelections || []).map(s => s.user_id)
+            (favoriteSelections || []).map(s => String(s.user_id))
         );
-        const eligibleMembers = members.filter(m => usersWithPichichi.has(m.user_id));
+        const eligibleMembers = members.filter(m => usersWithPichichi.has(String(m.user_id)));
 
         if (eligibleMembers.length === 0) {
-            document.getElementById('ranking-body').innerHTML =
-                '<tr><td colspan="3" class="text-center">Nadie ha elegido pichichi todavía.</td></tr>';
-            document.getElementById('pichichi-ranking-body').innerHTML =
-                '<tr><td colspan="3" class="text-center">Nadie ha elegido pichichi todavía.</td></tr>';
+            resetPodiumAndTables('Nadie ha elegido pichichi todavía.');
             return;
         }
 
