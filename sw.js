@@ -1,4 +1,4 @@
-const CACHE_NAME = 'riesgol-v48';
+const CACHE_NAME = 'riesgol-v56';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -10,6 +10,7 @@ const ASSETS_TO_CACHE = [
     './js/api.js',
     './js/pichichi-scoring.js',
     './js/scoring-rules.js',
+    './js/avatars.js',
     './js/flags.js',
     './js/matches.js',
     './js/results.js',

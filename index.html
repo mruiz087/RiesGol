@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="./css/styles.css?v=47">
+    <link rel="stylesheet" href="./css/styles.css?v=56">
 
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -145,42 +145,54 @@
                     <h2>Clasificación General</h2>
                     <p class="text-muted">Los premios más destacados</p>
                 </header>
+
+                <div class="podium-mode-bar">
+                    <span class="podium-mode-label">Iconos del podio</span>
+                    <div class="podium-mode-toggle" role="group" aria-label="Modo de iconos del podio">
+                        <button type="button" class="podium-mode-btn is-active" data-podium-mode="official" id="podium-mode-official">Oficiales</button>
+                        <button type="button" class="podium-mode-btn" data-podium-mode="avatars" id="podium-mode-avatars">Avatares</button>
+                    </div>
+                </div>
                 
                 <!-- Podio -->
                 <div class="podium-container" id="podium-container">
                     <!-- Posición 2 -->
                     <div class="podium-step step-2">
-                        <div class="podium-avatar">🥈</div>
+                        <div class="podium-avatar" id="podium-avatar-2"></div>
                         <div class="podium-name" id="podium-name-2">--</div>
                         <div class="podium-pts" id="podium-pts-2">0 pts</div>
                         <div class="podium-bar silver-bg">2º</div>
                     </div>
                     <!-- Posición 1 -->
                     <div class="podium-step step-1">
-                        <div class="podium-avatar">🥇</div>
+                        <div class="podium-avatar" id="podium-avatar-1"></div>
                         <div class="podium-name" id="podium-name-1">--</div>
                         <div class="podium-pts" id="podium-pts-1">0 pts</div>
                         <div class="podium-bar gold-bg">1º</div>
                     </div>
                     <!-- Posición especial (configurable por admin) -->
                     <div class="podium-step step-special" id="podium-step-special" style="display: none;">
-                        <div class="podium-avatar">🎯</div>
+                        <div class="podium-avatar" id="podium-avatar-special"></div>
                         <div class="podium-name" id="podium-name-special">--</div>
                         <div class="podium-pts" id="podium-pts-special">0 pts</div>
                         <div class="podium-bar special-bg" id="podium-label-special">Especial</div>
                     </div>
                     <!-- Posición Último (más pequeño) -->
                     <div class="podium-step step-last-mini">
-                        <div class="podium-avatar-mini">📦</div>
+                        <div class="podium-avatar-mini" id="podium-avatar-last"></div>
                         <div class="podium-name-mini" id="podium-name-last">--</div>
                     </div>
+                </div>
+
+                <div class="podium-rules-block">
+                    <div id="active-rules-chips" class="active-rules-chips"></div>
+                    <div id="active-rule-desc" class="active-rule-desc" hidden></div>
                 </div>
 
                 <!-- TABLA 1: Clasificación general -->
                 <div class="ranking-container">
                     <h3 class="ranking-section-title">Clasificación General</h3>
                     <p class="text-muted ranking-section-subtitle">Apuestas + Pichichi (total)</p>
-                    <div id="active-rules-chips" class="active-rules-chips"></div>
                     <table class="premium-table">
                         <thead>
                             <tr>
@@ -272,6 +284,12 @@
 
                     <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
 
+                    <h3 style="margin-bottom: 0.75rem;">Avatar</h3>
+                    <p class="avatar-picker-hint">Elige un avatar (100 opciones). Se muestra en el podio de la clasificación.</p>
+                    <div id="avatar-picker" class="avatar-picker" role="listbox" aria-label="Elegir avatar"></div>
+
+                    <hr style="margin: 2rem 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+
                     <h3 style="margin-bottom: 1rem;">Cerrar Sesión</h3>
                     <p style="color: var(--text-muted); margin-bottom: 1rem;">Al cerrar sesión, tendrás que volver a iniciar sesión para acceder a tu cuenta.</p>
                     <button id="logout-btn" class="btn-secondary" style="width: 100%;">Cerrar Sesión</button>
@@ -317,13 +335,20 @@
                             <li>Debes elegir <strong>un equipo por bombo</strong> al entrar en la porra.</li>
                             <li>Por cada gol de tus favoritos en partidos finalizados sumas: goles × multiplicador de fase × factor FIFA (FIFA del equipo más fuerte de la porra ÷ FIFA de tu equipo).</li>
                             <li>Los favoritos se pueden cambiar hasta el <strong>primer partido</strong> del torneo; después quedan fijos.</li>
+                            <li>El admin puede activar <strong>reglas especiales</strong> que modifican estos puntos (ver bloque siguiente).</li>
                         </ul>
+                    </details>
+
+                    <details class="opciones-rules-block">
+                        <summary>Reglas activables (por porra)</summary>
+                        <p class="opciones-rules-intro" style="margin-bottom: 0.75rem;">El administrador de cada porra decide cuáles están activas. En clasificación verás solo las que estén encendidas.</p>
+                        <div id="opciones-rules-activables"></div>
                     </details>
 
                     <details class="opciones-rules-block">
                         <summary>Clasificación y premios</summary>
                         <ul>
-                            <li><strong>Total</strong> = puntos de apuestas + puntos Pichichi.</li>
+                            <li><strong>Total</strong> = puntos de apuestas (aciertos) + puntos de reglas / Pichichi.</li>
                             <li>El admin puede activar un <strong>premio especial</strong> en una posición concreta (p. ej. 3º).</li>
                             <li><strong>Premio Paquete</strong> (último oficial): solo entre quienes han apostado en todos los partidos ya empezados/cerrados. Fallar no te elimina; no apostar sí.</li>
                         </ul>
@@ -446,18 +471,19 @@
 
     <!-- Scripts -->
     <script src="./js/supabase.js?v=39" defer></script>
-    <script src="./js/app.js?v=47" defer></script>
+    <script src="./js/app.js?v=56" defer></script>
     <script src="./js/auth.js" defer></script>
     <script src="./js/api.js?v=46" defer></script>
     <script src="./js/groups.js?v=44" defer></script>
-    <script src="./js/admin.js?v=47" defer></script>
+    <script src="./js/admin.js?v=50" defer></script>
     <script src="./js/pichichi-scoring.js?v=39" defer></script>
-    <script src="./js/scoring-rules.js?v=48" defer></script>
+    <script src="./js/scoring-rules.js?v=55" defer></script>
+    <script src="./js/avatars.js?v=53" defer></script>
     <script src="./js/flags.js" defer></script>
     <script src="./js/matches.js?v=48" defer></script>
-    <script src="./js/results.js?v=46" defer></script>
-    <script src="./js/scoring.js?v=46" defer></script>
+    <script src="./js/results.js?v=55" defer></script>
+    <script src="./js/scoring.js?v=55" defer></script>
     <script src="./js/pichichi.js?v=45" defer></script>
-    <script src="./js/opciones.js" defer></script>
+    <script src="./js/opciones.js?v=56" defer></script>
 </body>
 </html>

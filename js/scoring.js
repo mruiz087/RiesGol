@@ -1,10 +1,98 @@
 // js/scoring.js
 // Lógica para cargar y mostrar la clasificación y el podio (calculada dinámicamente por grupo)
 
+const PODIUM_MODE_KEY = 'riesgol_podium_mode';
+const PODIUM_OFFICIAL = {
+    1: '🥇',
+    2: '🥈',
+    special: '🎯',
+    last: '📦',
+};
+
+/** Último estado del podio para poder cambiar iconos sin recargar ranking */
+let lastPodiumState = {
+    first: null,
+    second: null,
+    special: null,
+    last: null,
+    specialVisible: false,
+};
+
+function getPodiumMode() {
+    const saved = localStorage.getItem(PODIUM_MODE_KEY);
+    return saved === 'avatars' ? 'avatars' : 'official';
+}
+
+function setPodiumMode(mode) {
+    const next = mode === 'avatars' ? 'avatars' : 'official';
+    localStorage.setItem(PODIUM_MODE_KEY, next);
+    syncPodiumModeButtons(next);
+    applyPodiumIcons();
+}
+
+function syncPodiumModeButtons(mode) {
+    document.querySelectorAll('[data-podium-mode]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-podium-mode') === mode);
+    });
+}
+
+function fillPodiumSlot(elId, officialEmoji, avatarId, hasUser) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+
+    if (!hasUser) {
+        el.classList.remove('is-official-icon');
+        el.innerHTML = '';
+        el.textContent = '';
+        return;
+    }
+
+    const mode = getPodiumMode();
+    if (mode === 'avatars' && window.Avatars?.fillAvatarEl) {
+        el.classList.remove('is-official-icon');
+        window.Avatars.fillAvatarEl(el, avatarId);
+        return;
+    }
+
+    el.classList.add('is-official-icon');
+    el.innerHTML = '';
+    el.textContent = officialEmoji;
+}
+
+function applyPodiumIcons() {
+    const s = lastPodiumState;
+    fillPodiumSlot('podium-avatar-1', PODIUM_OFFICIAL[1], s.first?.avatar, !!s.first);
+    fillPodiumSlot('podium-avatar-2', PODIUM_OFFICIAL[2], s.second?.avatar, !!s.second);
+    fillPodiumSlot('podium-avatar-special', PODIUM_OFFICIAL.special, s.special?.avatar, !!s.special && s.specialVisible);
+    fillPodiumSlot('podium-avatar-last', PODIUM_OFFICIAL.last, s.last?.avatar, !!s.last);
+}
+
+function initPodiumModeToggle() {
+    const bar = document.querySelector('.podium-mode-toggle');
+    if (!bar || bar.dataset.bound === '1') return;
+    bar.dataset.bound = '1';
+    syncPodiumModeButtons(getPodiumMode());
+    bar.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-podium-mode]');
+        if (!btn) return;
+        setPodiumMode(btn.getAttribute('data-podium-mode'));
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initPodiumModeToggle);
+
 function resetPodiumUi() {
     const setText = (id, text) => {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
+    };
+
+    lastPodiumState = {
+        first: null,
+        second: null,
+        special: null,
+        last: null,
+        specialVisible: false,
     };
 
     setText('podium-name-1', '--');
@@ -20,6 +108,7 @@ function resetPodiumUi() {
     setText('podium-pts-special', '0 pts');
     setText('podium-pts-13', '0 pts');
     setText('podium-label-special', 'Especial');
+    applyPodiumIcons();
 }
 
 function resetPodiumAndTables(message) {
@@ -43,14 +132,19 @@ window.loadRanking = async function() {
         if (!groupId) {
             resetPodiumAndTables('Selecciona una porra primero.');
             const chipsEl = document.getElementById('active-rules-chips');
+            const descEl = document.getElementById('active-rule-desc');
             if (chipsEl) chipsEl.innerHTML = '';
+            if (descEl) {
+                descEl.hidden = true;
+                descEl.innerHTML = '';
+            }
             return;
         }
 
         // ─── Obtener miembros del grupo ──────────────────────────────
         const { data: members, error: membersError } = await window.supabaseClient
             .from('group_members')
-            .select('user_id, users(name)')
+            .select('user_id, users(name, avatar)')
             .eq('group_id', groupId);
 
         if (membersError) throw membersError;
@@ -69,8 +163,14 @@ window.loadRanking = async function() {
 
         const scoringRules = await window.apiClient.getScoringRules(groupId);
         const chipsEl = document.getElementById('active-rules-chips');
+        const descEl = document.getElementById('active-rule-desc');
         if (chipsEl && window.ScoringRules?.renderActiveRulesChipsHtml) {
             chipsEl.innerHTML = window.ScoringRules.renderActiveRulesChipsHtml(scoringRules);
+            if (descEl) {
+                descEl.hidden = true;
+                descEl.innerHTML = '';
+                window.ScoringRules.bindActiveRulesChips?.(chipsEl, descEl);
+            }
         }
 
         // ─── Obtener apuestas del grupo (RPC + SELECT; todas las del grupo) ─
@@ -135,6 +235,7 @@ window.loadRanking = async function() {
             userPoints[uid] = {
                 userId: member.user_id,
                 name: member.users?.name || 'Anónimo',
+                avatar: member.users?.avatar || null,
                 betPoints: 0,
                 pichichiPoints: 0,
                 totalPoints: 0,
@@ -325,6 +426,14 @@ window.loadRanking = async function() {
             : [];
 
         // ─── Renderizar Podio ───────────────────────────────────────────
+        lastPodiumState = {
+            first: ranking[0] || null,
+            second: ranking[1] || null,
+            special: specialOrdinalUser || null,
+            last: paqueteWinner || null,
+            specialVisible: !!specialOrdinalUser,
+        };
+
         if (ranking[0]) {
             document.getElementById('podium-name-1').textContent = ranking[0].name;
             document.getElementById('podium-pts-1').textContent = `${formatPoints(ranking[0].totalPoints)} pts`;
@@ -370,6 +479,9 @@ window.loadRanking = async function() {
             if (pPtsSpecial) pPtsSpecial.textContent = '0 pts';
             if (pLabelSpecial) pLabelSpecial.textContent = 'Especial';
         }
+
+        syncPodiumModeButtons(getPodiumMode());
+        applyPodiumIcons();
 
         // ─── Renderizar Tabla General ───────────────────────────────────
         const tbody = document.getElementById('ranking-body');

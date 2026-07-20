@@ -225,14 +225,17 @@
             });
             pichPts = Number(br.total) || 0;
             if (br.blockedByConsuelo) {
-                extrasHtml = '<p class="results-user-bet-line results-user-bet-extras">Favorito: 0 (consuelo off)</p>';
+                extrasHtml = '<div class="results-user-bet-extras"><p class="results-user-bet-line">Favorito: 0 (consuelo off)</p></div>';
             } else if (br.lines?.length) {
-                extrasHtml = `<div class="results-user-bet-extras">${br.lines.map((line) => {
-                    if (line.key === 'matagigantes' && !Number(line.points)) {
-                        return `<p class="results-user-bet-line">${line.label}: ${line.detail}</p>`;
-                    }
-                    return `<p class="results-user-bet-line">${line.label}: <strong>${SR.formatPts(line.points)}</strong></p>`;
-                }).join('')}</div>`;
+                extrasHtml = `<div class="results-user-bet-extras">
+                    <p class="results-user-bet-composition-label">Composición de reglas</p>
+                    ${br.lines.map((line) => {
+                        if (line.key === 'matagigantes' && !Number(line.points)) {
+                            return `<p class="results-user-bet-line">${line.label}: ${line.detail}</p>`;
+                        }
+                        return `<p class="results-user-bet-line">${line.label}: <strong>${SR.formatPts(line.points)}</strong></p>`;
+                    }).join('')}
+                </div>`;
             }
         } else if (PS?.calcMatchPichichiForUser && selections.length) {
             const { total } = PS.calcMatchPichichiForUser(
@@ -256,7 +259,7 @@
                 <p class="results-user-bet-line results-user-bet-points">
                     <span>Aciertos <strong>+${formatPts(betPts)}</strong></span>
                     <span class="results-user-bet-sep" aria-hidden="true">·</span>
-                    <span>Pichichi <strong>+${formatPts(pichPts)}</strong></span>
+                    <span>Reglas <strong>+${formatPts(pichPts)}</strong></span>
                 </p>
                 ${extrasHtml}
             </div>

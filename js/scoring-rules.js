@@ -15,36 +15,6 @@
             icon: 'shield',
         },
         {
-            key: 'castigo',
-            category: 'favorite',
-            label: 'Castigo',
-            pending: true,
-            description: 'Tarjetas al favorito restan puntos × fase (requiere eventos).',
-            params: [
-                { key: 'yellow', label: 'Amarilla', default: 0.5, step: 0.25, min: 0 },
-                { key: 'red', label: 'Roja', default: 2, step: 0.5, min: 0 },
-            ],
-            icon: 'card',
-        },
-        {
-            key: 'defensor',
-            category: 'favorite',
-            label: 'Defensor',
-            pending: true,
-            description: 'Portero del favorito para un penalti antes de la prórroga (requiere eventos).',
-            params: [{ key: 'points', label: 'Puntos', default: 3, step: 0.5, min: 0 }],
-            icon: 'glove',
-        },
-        {
-            key: 'mal_altura',
-            category: 'favorite',
-            label: 'Mal de Altura',
-            pending: true,
-            description: 'El favorito falla un penalti a favor (requiere eventos).',
-            params: [{ key: 'points', label: 'Puntos', default: 2, step: 0.5, min: 0 }],
-            icon: 'miss',
-        },
-        {
             key: 'matagigantes',
             category: 'favorite',
             label: 'Matagigantes',
@@ -81,18 +51,6 @@
             icon: 'clock',
         },
         {
-            key: 'gol_agonico',
-            category: 'general',
-            label: 'Gol agónico',
-            pending: true,
-            description: 'Goles entre el min. indicado y el final valen el doble (requiere eventos).',
-            params: [
-                { key: 'from_minute', label: 'Desde min.', default: 85, step: 1, min: 1 },
-                { key: 'multiplier', label: 'Multiplicador', default: 2, step: 0.5, min: 1 },
-            ],
-            icon: 'late',
-        },
-        {
             key: 'lobo_estepario',
             category: 'general',
             label: 'Lobo estepario',
@@ -100,15 +58,6 @@
             description: 'Solo si un único usuario de toda la porra acierta el 1/X/2: cobra los fallos × este multiplicador.',
             params: [{ key: 'multiplier', label: 'Multiplicador', default: 1.5, step: 0.1, min: 1 }],
             icon: 'wolf',
-        },
-        {
-            key: 'comodin_doble',
-            category: 'general',
-            label: 'Comodín de Doble Apuesta',
-            pending: true,
-            description: 'Comodín por fase (excepto semi/final). Próximamente: sin efecto todavía.',
-            params: [],
-            icon: 'wildcard',
         },
     ];
 
@@ -399,18 +348,51 @@
     function renderActiveRulesChipsHtml(rules) {
         const r = normalizeScoringRules(rules);
         const chips = RULE_META.filter((m) => r[m.key]?.enabled).map((m) => {
-            const pending = m.pending ? '<span class="rule-chip-pending">próx.</span>' : '';
+            const desc = String(m.description || '').replace(/"/g, '&quot;');
+            const label = String(m.label || '').replace(/"/g, '&quot;');
             return `
-                <span class="rule-chip" title="${m.description.replace(/"/g, '&quot;')}">
+                <button type="button" class="rule-chip" data-rule-key="${m.key}"
+                    data-rule-label="${label}" data-rule-desc="${desc}"
+                    title="${label}" aria-pressed="false">
                     <span class="rule-icon-relief rule-icon-relief--sm">${svgIcon(m.icon)}</span>
                     <span class="rule-chip-label">${m.label}</span>
-                    ${pending}
-                </span>`;
+                </button>`;
         });
         if (!chips.length) {
             return '<p class="rules-chips-empty text-muted">Sin reglas especiales activas (solo puntuación base).</p>';
         }
         return `<div class="rules-chips">${chips.join('')}</div>`;
+    }
+
+    function bindActiveRulesChips(containerEl, descEl) {
+        if (!containerEl || !descEl) return;
+        if (containerEl.dataset.rulesBound === '1') return;
+        containerEl.dataset.rulesBound = '1';
+
+        containerEl.addEventListener('click', (e) => {
+            const chip = e.target.closest('.rule-chip[data-rule-key]');
+            if (!chip || !containerEl.contains(chip)) return;
+
+            const wasActive = chip.classList.contains('is-active');
+            containerEl.querySelectorAll('.rule-chip.is-active').forEach((c) => {
+                c.classList.remove('is-active');
+                c.setAttribute('aria-pressed', 'false');
+            });
+
+            if (wasActive) {
+                descEl.hidden = true;
+                descEl.innerHTML = '';
+                return;
+            }
+
+            chip.classList.add('is-active');
+            chip.setAttribute('aria-pressed', 'true');
+            const label = chip.getAttribute('data-rule-label') || '';
+            const desc = chip.getAttribute('data-rule-desc') || '';
+            descEl.hidden = false;
+            descEl.innerHTML = `<strong class="active-rule-desc-title">${label}</strong>
+                <p class="active-rule-desc-text">${desc}</p>`;
+        });
     }
 
     function renderAdminRulesFormHtml(rules) {
@@ -484,6 +466,7 @@
         calcBetPointsForMatchWithRules,
         calcFavoriteMatchBreakdown,
         renderActiveRulesChipsHtml,
+        bindActiveRulesChips,
         renderAdminRulesFormHtml,
         readRulesFromForm,
         formatPts,
