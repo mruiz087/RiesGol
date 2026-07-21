@@ -613,11 +613,19 @@ const API = {
         const fnUnavailable = /failed to send|edge function|fetch|not found|404/i.test(fnResult.error || '');
         if (!fnUnavailable) return { error: fnResult.error };
 
-        const { error } = await window.supabaseClient
-            .from('groups')
-            .delete()
-            .eq('id', gid);
+        // Fallback: borrar hijos sin CASCADE y luego el grupo
+        const client = window.supabaseClient;
+        if (!client) return { error: 'Sin conexión' };
 
+        const childTables = ['favorite_selections', 'bets', 'group_team_values'];
+        for (const table of childTables) {
+            const { error: childErr } = await client.from(table).delete().eq('group_id', gid);
+            if (childErr && !/does not exist|relation|PGRST205|42P01/i.test(childErr.message || '')) {
+                return { error: childErr.message || 'No se pudo eliminar datos de la porra' };
+            }
+        }
+
+        const { error } = await client.from('groups').delete().eq('id', gid);
         if (error) return { error: error.message || 'No se pudo eliminar la porra' };
         return { success: true };
     },

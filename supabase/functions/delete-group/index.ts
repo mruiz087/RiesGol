@@ -29,6 +29,23 @@ function getBearerToken(req: Request) {
   return m ? m[1] : null;
 }
 
+/** Borra filas hijas que aún no tienen ON DELETE CASCADE hacia groups. */
+async function deleteGroupChildren(supabase: ReturnType<typeof createClient>, groupId: number) {
+  const tables = [
+    "favorite_selections",
+    "bets",
+    "group_team_values",
+  ];
+
+  for (const table of tables) {
+    const { error } = await supabase.from(table).delete().eq("group_id", groupId);
+    // Si la tabla no existe en algún entorno, no abortar por 404/PGRST
+    if (error && !/does not exist|relation|PGRST205|42P01/i.test(error.message || "")) {
+      throw error;
+    }
+  }
+}
+
 serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -59,6 +76,8 @@ serve(async (req) => {
     if (!actorMember || actorMember.role !== "admin") {
       return jsonResponse({ error: "Forbidden" }, 403);
     }
+
+    await deleteGroupChildren(supabase, Number(groupId));
 
     const { error: delErr } = await supabase.from("groups").delete().eq("id", groupId);
     if (delErr) throw delErr;

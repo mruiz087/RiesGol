@@ -7,12 +7,17 @@ let avatarPickerBound = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     const changeNameForm = document.getElementById('change-name-form');
+    const changePasswordForm = document.getElementById('change-password-form');
     const logoutBtn = document.getElementById('logout-btn');
     const nameInput = document.getElementById('new-name');
     const saveBtn = document.getElementById('save-name-btn');
 
     if (changeNameForm) {
         changeNameForm.addEventListener('submit', handleChangeName);
+    }
+
+    if (changePasswordForm) {
+        changePasswordForm.addEventListener('submit', handleChangePassword);
     }
 
     if (logoutBtn) {
@@ -45,8 +50,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saveBtn) {
         saveBtn.disabled = true;
     }
+
+    const opcionesRoot = document.getElementById('opciones-view');
+    if (opcionesRoot) {
+        opcionesRoot.addEventListener('click', (e) => {
+            const tabBtn = e.target.closest?.('[data-opciones-tab]');
+            if (!tabBtn || !opcionesRoot.contains(tabBtn)) return;
+            e.preventDefault();
+            switchOpcionesTab(tabBtn.getAttribute('data-opciones-tab'));
+        });
+    }
 });
 
+function switchOpcionesTab(tabId) {
+    const root = document.getElementById('opciones-view');
+    if (!root || !tabId) return;
+
+    root.querySelectorAll('[data-opciones-tab]').forEach((btn) => {
+        const active = btn.getAttribute('data-opciones-tab') === tabId;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', String(active));
+    });
+
+    root.querySelectorAll('[data-opciones-panel]').forEach((panel) => {
+        const active = panel.getAttribute('data-opciones-panel') === tabId;
+        panel.classList.toggle('active', active);
+        if (active) panel.removeAttribute('hidden');
+        else panel.setAttribute('hidden', '');
+    });
+}
 function updateSaveNameButton() {
     const nameInput = document.getElementById('new-name');
     const saveBtn = document.getElementById('save-name-btn');
@@ -248,6 +280,37 @@ async function handleChangeName(e) {
     } catch (error) {
         console.error('Error actualizando nombre:', error);
         window.toast?.error('Error al actualizar el nombre: ' + error.message);
+    } finally {
+        window.hideLoading();
+    }
+}
+
+async function handleChangePassword(e) {
+    e.preventDefault();
+    window.showLoading();
+
+    const user = window.getCurrentUser();
+    if (!user || !window.supabaseClient) {
+        window.toast?.error('Debes iniciar sesión para cambiar la contraseña.');
+        window.hideLoading();
+        return;
+    }
+
+    const newPassword = document.getElementById('opciones-new-password')?.value || '';
+    const confirmPassword = document.getElementById('opciones-new-password-confirm')?.value || '';
+
+    try {
+        if (newPassword.length < 6) throw new Error('La nueva contraseña debe tener al menos 6 caracteres.');
+        if (newPassword !== confirmPassword) throw new Error('Las contraseñas no coinciden.');
+
+        const { error } = await window.supabaseClient.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+
+        document.getElementById('change-password-form')?.reset();
+        window.toast?.success('Contraseña actualizada.');
+    } catch (error) {
+        console.error('Error cambiando contraseña:', error);
+        window.toast?.error(error.message || 'No se pudo cambiar la contraseña.');
     } finally {
         window.hideLoading();
     }
