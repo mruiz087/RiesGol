@@ -3,15 +3,25 @@
 
 // Configuración de fases: nombre en español y multiplicador
 const PHASE_CONFIG = {
-    'GROUP_STAGE':    { label: 'Fase de Grupos',          multiplier: 1 },
-    'LEAGUE_STAGE':   { label: 'Fase liga',               multiplier: 1 },
-    'LAST_32':        { label: 'Dieciseisavos',            multiplier: 2 },
-    'PLAYOFFS':       { label: 'Playoffs',                 multiplier: 2 },
-    'LAST_16':        { label: 'Octavos',                  multiplier: 3 },
-    'ROUND_OF_16':    { label: 'Octavos',                  multiplier: 3 },
-    'QUARTER_FINALS': { label: 'Cuartos',                  multiplier: 4 },
-    'SEMI_FINALS':    { label: 'Semifinal',                multiplier: 5 },
-    'FINAL':          { label: 'Final',                    multiplier: 6 },
+    'QUALIFICATION':     { label: 'Clasificación',           multiplier: 1 },
+    'PRELIMINARY_ROUND': { label: 'Ronda preliminar',        multiplier: 1 },
+    'QUALIFYING_ROUND':  { label: 'Ronda clasificatoria',    multiplier: 1 },
+    'ROUND_1':           { label: 'Primera ronda',           multiplier: 1 },
+    'ROUND_2':           { label: 'Segunda ronda',           multiplier: 1 },
+    'ROUND_3':           { label: 'Tercera ronda',           multiplier: 1 },
+    'ROUND_4':           { label: 'Cuarta ronda',            multiplier: 1 },
+    'GROUP_STAGE':       { label: 'Fase de Grupos',          multiplier: 1 },
+    'LEAGUE_STAGE':      { label: 'Fase liga',               multiplier: 1 },
+    'LAST_64':           { label: 'Treintaidosavos',         multiplier: 1 },
+    'LAST_32':           { label: 'Dieciseisavos',           multiplier: 2 },
+    'PLAYOFFS':          { label: 'Playoffs',                multiplier: 2 },
+    'PLAYOFF_ROUND_1':   { label: 'Playoff R1',              multiplier: 2 },
+    'PLAYOFF_ROUND_2':   { label: 'Playoff R2',              multiplier: 2 },
+    'LAST_16':           { label: 'Octavos',                 multiplier: 3 },
+    'ROUND_OF_16':       { label: 'Octavos',                 multiplier: 3 },
+    'QUARTER_FINALS':    { label: 'Cuartos',                 multiplier: 4 },
+    'SEMI_FINALS':       { label: 'Semifinal',               multiplier: 5 },
+    'FINAL':             { label: 'Final',                   multiplier: 6 },
 };
 
 const TEAM_NAME_TRANSLATIONS = {

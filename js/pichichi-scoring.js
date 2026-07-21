@@ -2,10 +2,20 @@
 // Cálculo compartido de puntos Pichichi (partidos + clasificación)
 
 const PHASE_MULTIPLIERS = {
+    'QUALIFICATION': 1,
+    'PRELIMINARY_ROUND': 1,
+    'QUALIFYING_ROUND': 1,
+    'ROUND_1': 1,
+    'ROUND_2': 1,
+    'ROUND_3': 1,
+    'ROUND_4': 1,
     'GROUP_STAGE': 1,
     'LEAGUE_STAGE': 1,
+    'LAST_64': 1,
     'LAST_32': 2,
     'PLAYOFFS': 2,
+    'PLAYOFF_ROUND_1': 2,
+    'PLAYOFF_ROUND_2': 2,
     'LAST_16': 3,
     'ROUND_OF_16': 3,
     'QUARTER_FINALS': 4,

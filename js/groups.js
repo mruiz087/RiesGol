@@ -102,6 +102,8 @@ const Groups = {
                 CHAMPIONS: 'Champions',
                 EUROPA: 'Europa League',
                 CONFERENCE: 'Conference',
+                COPA_DEL_REY: 'Copa del Rey',
+                NATIONS_LEAGUE: 'Nations League',
             };
             const tipoLabel = tipoLabels[t.tipo] || t.tipo || 'Torneo';
             return `

@@ -24,13 +24,17 @@ const FOOTBALL_DATA_KEY = Deno.env.get("API_SPORTS_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-// Competiciones soportadas: selecciones (WC, EC) y clubes UEFA (CL, EL, UCL).
+// Competiciones: selecciones, UEFA clubes, Copa del Rey, Nations League.
+// Candidatas descartadas (no existen en API v4): Women's CL, Copa de la Reina,
+// códigos WWC/WEU/etc. Si el plan free no incluye CDR/UNL, el sync las salta.
 const ALLOWED = [
   { code: "WC", tipo: "WORLD_CUP" },
   { code: "EC", tipo: "EURO" },
   { code: "CL", tipo: "CHAMPIONS" },
   { code: "EL", tipo: "EUROPA" },
   { code: "UCL", tipo: "CONFERENCE" },
+  { code: "CDR", tipo: "COPA_DEL_REY" },
+  { code: "UNL", tipo: "NATIONS_LEAGUE" },
 ];
 
 function deriveEstado(startDate: string | null, endDate: string | null): string {
@@ -93,8 +97,10 @@ serve(async (req) => {
 
       const comp = await response.json();
 
-      if (comp.errorCode) {
-        console.warn(`API error for ${code}:`, comp.message);
+      if (!response.ok || comp.errorCode) {
+        const msg = comp.message || comp.error || `HTTP ${response.status}`;
+        // 403 = competición restringida al plan; 404 = no existe → se omite
+        console.warn(`Skip ${code} (${response.status}):`, msg);
         continue;
       }
 

@@ -685,10 +685,20 @@ const Admin = {
 
     phaseLabel(fase) {
         const map = {
+            QUALIFICATION: 'Clasificación',
+            PRELIMINARY_ROUND: 'Ronda preliminar',
+            QUALIFYING_ROUND: 'Ronda clasificatoria',
+            ROUND_1: 'Primera ronda',
+            ROUND_2: 'Segunda ronda',
+            ROUND_3: 'Tercera ronda',
+            ROUND_4: 'Cuarta ronda',
             GROUP_STAGE: 'Fase de Grupos',
             LEAGUE_STAGE: 'Fase liga',
+            LAST_64: 'Treintaidosavos',
             LAST_32: 'Dieciseisavos',
             PLAYOFFS: 'Playoffs',
+            PLAYOFF_ROUND_1: 'Playoff R1',
+            PLAYOFF_ROUND_2: 'Playoff R2',
             LAST_16: 'Octavos',
             ROUND_OF_16: 'Octavos',
             QUARTER_FINALS: 'Cuartos',

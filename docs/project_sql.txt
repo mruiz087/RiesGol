@@ -24,7 +24,9 @@ create table if not exists tournaments (
             'EURO',
             'CHAMPIONS',
             'EUROPA',
-            'CONFERENCE'
+            'CONFERENCE',
+            'COPA_DEL_REY',
+            'NATIONS_LEAGUE'
         )
     ),
 
