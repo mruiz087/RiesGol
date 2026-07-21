@@ -1942,18 +1942,11 @@ h1, h2, h3, h4 {
 .podium-avatar-mini.is-official-icon {
     border: none;
     background: transparent;
-    font-size: 2.5rem;
+    font-size: 1.6rem;
     line-height: 1;
     display: grid;
     place-items: center;
-}
-
-.step-1 .podium-avatar.is-official-icon {
-    font-size: 3.25rem;
-}
-
-.step-last-mini .podium-avatar-mini.is-official-icon {
-    font-size: 1.6rem;
+    overflow: visible;
 }
 
 .podium-container {
@@ -1965,7 +1958,7 @@ h1, h2, h3, h4 {
     margin: 2rem 0 3rem 0;
     min-height: 220px;
     width: 100%;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .podium-step {
@@ -2070,6 +2063,7 @@ h1, h2, h3, h4 {
         gap: 0.35rem 0.4rem;
         min-height: 180px;
         margin: 1.25rem 0 2rem;
+        overflow: visible;
     }
 
     .podium-step {
@@ -2086,6 +2080,11 @@ h1, h2, h3, h4 {
         width: 1.75rem;
         height: 1.75rem;
         margin-bottom: 0.25rem;
+    }
+
+    .podium-avatar.is-official-icon,
+    .podium-avatar-mini.is-official-icon {
+        font-size: 1.6rem;
     }
 
     .step-1 .podium-avatar {

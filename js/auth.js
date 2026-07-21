@@ -296,10 +296,15 @@ function onLoginSuccess() {
 
     if (window.Groups) {
         window.Groups.loadUserGroups();
+        // Siempre Mis Porras al entrar / refrescar (sin restaurar la última porra)
+        window.Groups.currentGroupId = null;
+        window.Groups.currentTournamentId = null;
+        window.Groups.currentUserHasPichichi = null;
     }
-
-    const hasGroup = window.Groups?.currentGroupId != null;
-    window.navigateTo(hasGroup ? 'dashboard-view' : 'my-groups-view');
+    localStorage.removeItem('currentGroupId');
+    localStorage.removeItem('currentTournamentId');
+    window.updateNavVisibility?.();
+    window.navigateTo('my-groups-view');
 }
 
 async function handleLogout(e) {

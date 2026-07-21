@@ -368,13 +368,7 @@ const Groups = {
             window.navigateTo('my-groups-view');
         });
 
-        // Recuperar grupo seleccionado del localStorage
-        const savedGroupId = localStorage.getItem('currentGroupId');
-        const savedTournamentId = localStorage.getItem('currentTournamentId');
-        if (savedGroupId && savedTournamentId) {
-            Groups.currentGroupId = parseInt(savedGroupId);
-            Groups.currentTournamentId = parseInt(savedTournamentId);
-        }
+        // No restaurar porra desde localStorage: al abrir la app siempre se empieza en Mis Porras
     }
 };
 
