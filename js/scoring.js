@@ -248,7 +248,9 @@ window.loadRanking = async function() {
         // Multiplicadores de fase
         const phaseMultipliers = {
             'GROUP_STAGE': 1,
+            'LEAGUE_STAGE': 1,
             'LAST_32': 2,
+            'PLAYOFFS': 2,
             'LAST_16': 3,
             'ROUND_OF_16': 3,
             'QUARTER_FINALS': 4,

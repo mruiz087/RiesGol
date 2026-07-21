@@ -668,7 +668,7 @@ const Admin = {
     buildEquiposCsv(teams, groupValues) {
         const byId = new Map((groupValues || []).map((gv) => [String(gv.team_id), gv]));
         const translate = window.translateTeamName || ((n) => n);
-        const headers = ['Equipo', 'Bombo', 'Puntos_FIFA'];
+        const headers = ['Equipo', 'Bombo', 'Coeficiente'];
         const rows = (teams || [])
             .slice()
             .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'))
@@ -677,7 +677,7 @@ const Admin = {
                 return {
                     Equipo: translate(t.nombre || ''),
                     Bombo: gv?.bombo ?? '',
-                    Puntos_FIFA: gv?.valor ?? '',
+                    Coeficiente: gv?.valor ?? '',
                 };
             });
         return Admin.toCsv(headers, rows);
@@ -686,7 +686,9 @@ const Admin = {
     phaseLabel(fase) {
         const map = {
             GROUP_STAGE: 'Fase de Grupos',
+            LEAGUE_STAGE: 'Fase liga',
             LAST_32: 'Dieciseisavos',
+            PLAYOFFS: 'Playoffs',
             LAST_16: 'Octavos',
             ROUND_OF_16: 'Octavos',
             QUARTER_FINALS: 'Cuartos',

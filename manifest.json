@@ -1,7 +1,7 @@
 {
-  "name": "RiesGol - Porra Mundial",
+  "name": "RiesGol - Porra",
   "short_name": "RiesGol",
-  "description": "La porra definitiva del Mundial y la Eurocopa",
+  "description": "La porra definitiva: Mundial, Eurocopa y competiciones UEFA",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f111a",

@@ -792,6 +792,14 @@ h1, h2, h3, h4 {
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
+.team-crest {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+}
+
 .team-flag-missing {
     display: inline-block;
     background: rgba(255, 255, 255, 0.12);
@@ -1156,6 +1164,9 @@ h1, h2, h3, h4 {
     font-weight: 600;
     font-size: 1rem;
     margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .team-option-info {

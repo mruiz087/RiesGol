@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RiesGol - Porra Mundial/Eurocopa</title>
+    <title>RiesGol - Porra Mundial, Euro y UEFA</title>
     
     <!-- PWA Meta tags -->
     <meta name="theme-color" content="#0f111a">
@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="./css/styles.css?v=63">
+    <link rel="stylesheet" href="./css/styles.css?v=68">
 
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -51,7 +51,7 @@
             <section id="login-view" class="view active">
                 <div class="auth-container glass-panel">
                     <h1 class="logo-text">RiesGol</h1>
-                    <p class="subtitle" id="auth-subtitle">La porra definitiva del Mundial</p>
+                    <p class="subtitle" id="auth-subtitle">La porra definitiva</p>
 
                     <form id="auth-form">
                         <div class="input-group">
@@ -372,8 +372,8 @@
                                 <details class="opciones-rules-block">
                                     <summary>Multiplicadores de fase</summary>
                                     <ul class="opciones-rules-multipliers">
-                                        <li>Fase de grupos → ×1</li>
-                                        <li>Dieciseisavos → ×2</li>
+                                        <li>Fase de grupos / fase liga → ×1</li>
+                                        <li>Dieciseisavos / playoffs → ×2</li>
                                         <li>Octavos → ×3</li>
                                         <li>Cuartos → ×4</li>
                                         <li>Semifinal → ×5</li>
@@ -385,7 +385,7 @@
                                     <summary>Pichichi (equipos favoritos)</summary>
                                     <ul>
                                         <li>Debes elegir <strong>un equipo por bombo</strong> al entrar en la porra.</li>
-                                        <li>Por cada gol de tus favoritos en partidos finalizados sumas: goles × multiplicador de fase × factor FIFA (FIFA del equipo más fuerte de la porra ÷ FIFA de tu equipo).</li>
+                                        <li>Por cada gol de tus favoritos en partidos finalizados sumas: goles × multiplicador de fase × factor de coeficiente (coeficiente del equipo más fuerte de la porra ÷ coeficiente de tu equipo).</li>
                                         <li>Los favoritos se pueden cambiar hasta el <strong>primer partido</strong> del torneo; después quedan fijos.</li>
                                         <li>El admin puede activar <strong>reglas especiales</strong> que modifican estos puntos (ver bloque siguiente).</li>
                                     </ul>
@@ -490,9 +490,9 @@
                         </div>
 
                         <div class="admin-tab-panel" data-admin-panel="equipos" role="tabpanel" hidden>
-                            <h3 class="admin-tab-heading">Puntos FIFA / Coeficientes</h3>
-                            <p style="color: var(--text-muted); margin-bottom: 1rem;">
-                                Asigna el <strong>valor</strong> y el <strong>bombo</strong> de cada equipo para esta porra.
+                            <h3 class="admin-tab-heading">Coeficientes / bombos</h3>
+                            <p class="text-muted" style="margin-bottom: 1rem;">
+                                Asigna el <strong>valor</strong> (coeficiente FIFA/UEFA u otro) y el <strong>bombo</strong> de cada equipo para esta porra.
                                 Los equipos se cargan automáticamente desde los partidos del torneo.
                             </p>
                             <form id="team-values-form">
@@ -517,7 +517,7 @@
                             <div class="admin-export-options" id="admin-export-options">
                                 <label class="admin-export-option">
                                     <input type="checkbox" id="export-equipos" checked>
-                                    <span>Equipos y puntos FIFA</span>
+                                    <span>Equipos y coeficientes</span>
                                 </label>
                                 <label class="admin-export-option">
                                     <input type="checkbox" id="export-partidos" checked>
@@ -552,19 +552,19 @@
 
     <!-- Scripts -->
     <script src="./js/supabase.js?v=39" defer></script>
-    <script src="./js/app.js?v=66" defer></script>
-    <script src="./js/auth.js?v=63" defer></script>
+    <script src="./js/app.js?v=68" defer></script>
+    <script src="./js/auth.js?v=67" defer></script>
     <script src="./js/api.js?v=66" defer></script>
-    <script src="./js/groups.js?v=44" defer></script>
-    <script src="./js/admin.js?v=59" defer></script>
-    <script src="./js/pichichi-scoring.js?v=39" defer></script>
-    <script src="./js/scoring-rules.js?v=58" defer></script>
+    <script src="./js/groups.js?v=67" defer></script>
+    <script src="./js/admin.js?v=67" defer></script>
+    <script src="./js/pichichi-scoring.js?v=67" defer></script>
+    <script src="./js/scoring-rules.js?v=67" defer></script>
     <script src="./js/avatars.js?v=53" defer></script>
-    <script src="./js/flags.js" defer></script>
-    <script src="./js/matches.js?v=61" defer></script>
-    <script src="./js/results.js?v=60" defer></script>
-    <script src="./js/scoring.js?v=55" defer></script>
-    <script src="./js/pichichi.js?v=45" defer></script>
+    <script src="./js/flags.js?v=68" defer></script>
+    <script src="./js/matches.js?v=68" defer></script>
+    <script src="./js/results.js?v=68" defer></script>
+    <script src="./js/scoring.js?v=67" defer></script>
+    <script src="./js/pichichi.js?v=68" defer></script>
     <script src="./js/opciones.js?v=66" defer></script>
 </body>
 </html>

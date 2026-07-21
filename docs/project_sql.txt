@@ -21,7 +21,10 @@ create table if not exists tournaments (
     tipo text not null check (
         tipo in (
             'WORLD_CUP',
-            'EURO'
+            'EURO',
+            'CHAMPIONS',
+            'EUROPA',
+            'CONFERENCE'
         )
     ),
 

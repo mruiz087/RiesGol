@@ -4,7 +4,9 @@
 // Configuración de fases: nombre en español y multiplicador
 const PHASE_CONFIG = {
     'GROUP_STAGE':    { label: 'Fase de Grupos',          multiplier: 1 },
+    'LEAGUE_STAGE':   { label: 'Fase liga',               multiplier: 1 },
     'LAST_32':        { label: 'Dieciseisavos',            multiplier: 2 },
+    'PLAYOFFS':       { label: 'Playoffs',                 multiplier: 2 },
     'LAST_16':        { label: 'Octavos',                  multiplier: 3 },
     'ROUND_OF_16':    { label: 'Octavos',                  multiplier: 3 },
     'QUARTER_FINALS': { label: 'Cuartos',                  multiplier: 4 },
@@ -119,6 +121,7 @@ window.loadMatches = async function() {
         let bomboByTeamId = {};
 
         const teamsCatalog = await window.apiClient.getTeams(tournamentId);
+        window.setTeamCrestMap?.(teamsCatalog || []);
         const groupValues = await window.apiClient.getGroupTeamValues(groupId);
         scoringRules = await window.apiClient.getScoringRules(groupId);
         bomboByTeamId = window.ScoringRules?.buildBomboByTeamId?.(groupValues) || {};
@@ -526,11 +529,15 @@ function createMatchCard(match, userBet, multiplier, userPichichiSelections = []
         <div class="match-row">
             <div class="match-team match-team-home">
                 <span class="team-name">${localTeamName}</span>
-                ${typeof window.teamFlagHtml === 'function' ? window.teamFlagHtml(match.equipo_local_nombre) : ''}
+                ${typeof window.teamBadgeHtml === 'function'
+                    ? window.teamBadgeHtml(match.equipo_local_nombre, { teamId: match.equipo_local_id })
+                    : (typeof window.teamFlagHtml === 'function' ? window.teamFlagHtml(match.equipo_local_nombre) : '')}
             </div>
             ${scoreHtml}
             <div class="match-team match-team-away">
-                ${typeof window.teamFlagHtml === 'function' ? window.teamFlagHtml(match.equipo_visitante_nombre) : ''}
+                ${typeof window.teamBadgeHtml === 'function'
+                    ? window.teamBadgeHtml(match.equipo_visitante_nombre, { teamId: match.equipo_visitante_id })
+                    : (typeof window.teamFlagHtml === 'function' ? window.teamFlagHtml(match.equipo_visitante_nombre) : '')}
                 <span class="team-name">${awayTeamName}</span>
             </div>
         </div>

@@ -119,14 +119,25 @@ async function syncOneTournament(
   }
 
   const uniqueTeamNames = new Set<string>();
-  fixtures.forEach((item: { homeTeam?: { name?: string }; awayTeam?: { name?: string } }) => {
-    if (item.homeTeam?.name) uniqueTeamNames.add(item.homeTeam.name);
-    if (item.awayTeam?.name) uniqueTeamNames.add(item.awayTeam.name);
+  const crestByName: Record<string, string> = {};
+  fixtures.forEach((item: {
+    homeTeam?: { name?: string; crest?: string };
+    awayTeam?: { name?: string; crest?: string };
+  }) => {
+    if (item.homeTeam?.name) {
+      uniqueTeamNames.add(item.homeTeam.name);
+      if (item.homeTeam.crest) crestByName[item.homeTeam.name] = item.homeTeam.crest;
+    }
+    if (item.awayTeam?.name) {
+      uniqueTeamNames.add(item.awayTeam.name);
+      if (item.awayTeam.crest) crestByName[item.awayTeam.name] = item.awayTeam.crest;
+    }
   });
 
   const teamsPayload = [...uniqueTeamNames].map((nombre) => ({
     nombre,
     tournament_id: tournamentId,
+    crest_url: crestByName[nombre] || null,
   }));
 
   if (teamsPayload.length > 0) {
@@ -146,6 +157,19 @@ async function syncOneTournament(
         if (!existing) {
           await supabase.from("teams").insert(row);
         }
+      }
+    }
+
+    // Actualizar crest_url en equipos ya existentes (ignoreDuplicates no lo hace)
+    for (const [nombre, crest] of Object.entries(crestByName)) {
+      if (!crest) continue;
+      const { error: crestErr } = await supabase
+        .from("teams")
+        .update({ crest_url: crest })
+        .eq("tournament_id", tournamentId)
+        .eq("nombre", nombre);
+      if (crestErr && !/crest_url/i.test(crestErr.message || "")) {
+        console.warn("Update crest_url:", crestErr.message);
       }
     }
   }

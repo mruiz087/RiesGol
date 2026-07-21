@@ -70,6 +70,7 @@ window.loadPichichiData = async function() {
         await window.apiClient.ensureTeamsFromMatches(tournamentId);
 
         const teamsCatalog = await window.apiClient.getTeams(tournamentId);
+        window.setTeamCrestMap?.(teamsCatalog || []);
         const groupValues = await window.apiClient.getGroupTeamValues(groupId);
         const configComplete = isPichichiConfigComplete(teamsCatalog, groupValues);
 
@@ -82,7 +83,7 @@ window.loadPichichiData = async function() {
         }
 
         if (!teams.length) {
-            document.getElementById('bombos-container').innerHTML = '<p class="text-center pichichi-section-full">No hay equipos configurados aún. Ve a <strong>Admin → Puntos FIFA / Coeficientes</strong> para asignar valor y bombo a cada equipo.</p>';
+            document.getElementById('bombos-container').innerHTML = '<p class="text-center pichichi-section-full">No hay equipos configurados aún. Ve a <strong>Admin → Coeficientes / bombos</strong> para asignar valor y bombo a cada equipo.</p>';
             return;
         }
 
@@ -136,6 +137,9 @@ window.loadPichichiData = async function() {
                     ? (maxFifaPoints / selectedTeam.valor).toFixed(2) 
                     : 'N/A';
 
+                const badge = typeof window.teamBadgeHtml === 'function'
+                    ? window.teamBadgeHtml(selectedTeam.nombre, { teamId: selectedTeam.id, crestUrl: selectedTeam.crest_url })
+                    : '';
                 card.innerHTML = `
                     <div class="bombo-card__header">
                         <span class="bombo-badge">${grupoNombre}</span>
@@ -143,7 +147,7 @@ window.loadPichichiData = async function() {
                     </div>
                     <div style="padding: 0.75rem 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
                         ${selectedTeam 
-                            ? `<strong style="color:var(--primary);">${displayTeamName(selectedTeam.nombre)}</strong>
+                            ? `<strong style="color:var(--primary); display:inline-flex; align-items:center; gap:0.4rem;">${badge}${displayTeamName(selectedTeam.nombre)}</strong>
                                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.3rem;">
                                    ${Number(selectedTeam.valor).toFixed(2)} pts · Valor gol: <strong>${baseGoalValue} pts</strong>
                                </div>`
@@ -164,7 +168,7 @@ window.loadPichichiData = async function() {
                                 data-grupo="${grupoNombre}"
                                 data-value="${baseGoalValue}"
                                 data-team-name="${displayTeamName(team.nombre)}">
-                            <div class="team-option-name">${displayTeamName(team.nombre)}</div>
+                            <div class="team-option-name">${typeof window.teamBadgeHtml === 'function' ? window.teamBadgeHtml(team.nombre, { teamId: team.id, crestUrl: team.crest_url }) : ''}${displayTeamName(team.nombre)}</div>
                             <div class="team-option-info">${Number(team.valor).toFixed(2)} pts</div>
                             <div class="team-option-value">Valor: ${baseGoalValue} pts</div>
                         </button>
@@ -194,7 +198,7 @@ window.loadPichichiData = async function() {
             const goalValue = (maxFifaPoints / team.valor).toFixed(2);
             return `
                 <tr>
-                    <td>${displayTeamName(team.nombre)}</td>
+                    <td style="display:flex;align-items:center;gap:0.4rem;">${typeof window.teamBadgeHtml === 'function' ? window.teamBadgeHtml(team.nombre, { teamId: team.id, crestUrl: team.crest_url }) : ''}${displayTeamName(team.nombre)}</td>
                     <td style="text-align:center;">${Number(team.valor).toFixed(2)}</td>
                     <td style="text-align:center; font-weight:bold; color:var(--primary);">${goalValue} pts</td>
                 </tr>

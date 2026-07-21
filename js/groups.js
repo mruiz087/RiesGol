@@ -96,7 +96,14 @@ const Groups = {
             const status = Groups.getTournamentPickerStatus(t.estado);
             const dates = Groups.formatTournamentDateRange(t.fecha_inicio, t.fecha_fin);
             const selected = selectedId === t.id ? ' selected' : '';
-            const tipoLabel = t.tipo === 'EURO' ? 'Eurocopa' : 'Mundial';
+            const tipoLabels = {
+                WORLD_CUP: 'Mundial',
+                EURO: 'Eurocopa',
+                CHAMPIONS: 'Champions',
+                EUROPA: 'Europa League',
+                CONFERENCE: 'Conference',
+            };
+            const tipoLabel = tipoLabels[t.tipo] || t.tipo || 'Torneo';
             return `
                 <button type="button" class="tournament-card${selected}"
                         data-tournament-id="${t.id}"

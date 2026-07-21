@@ -4,7 +4,9 @@
 (function () {
     const RESULTS_PHASE_CONFIG = {
         GROUP_STAGE: { label: 'Fase de Grupos', multiplier: 1 },
+        LEAGUE_STAGE: { label: 'Fase liga', multiplier: 1 },
         LAST_32: { label: 'Dieciseisavos', multiplier: 2 },
+        PLAYOFFS: { label: 'Playoffs', multiplier: 2 },
         LAST_16: { label: 'Octavos', multiplier: 3 },
         ROUND_OF_16: { label: 'Octavos', multiplier: 3 },
         QUARTER_FINALS: { label: 'Cuartos', multiplier: 4 },
@@ -40,7 +42,10 @@
         return name;
     }
 
-    function flagHtml(name) {
+    function flagHtml(name, teamId) {
+        if (typeof window.teamBadgeHtml === 'function') {
+            return window.teamBadgeHtml(name, { teamId });
+        }
         if (typeof window.teamFlagHtml === 'function') {
             return window.teamFlagHtml(name);
         }
@@ -79,9 +84,9 @@
         }
     }
 
-    function teamCell(apiName, side) {
+    function teamCell(apiName, side, teamId) {
         const display = translateTeamName(apiName);
-        const flag = flagHtml(apiName);
+        const flag = flagHtml(apiName, teamId);
         if (side === 'home') {
             return `
                 <span class="results-team results-team-home">
@@ -307,13 +312,13 @@
                 <tr class="results-match-row${isOpen ? ' is-expanded' : ''}" data-match-id="${mid}" tabindex="0" role="button">
                     <td class="results-date">${formatDate(match.fecha_inicio)}</td>
                     <td class="results-team-cell results-team-cell-home">
-                        ${teamCell(match.equipo_local_nombre, 'home')}
+                        ${teamCell(match.equipo_local_nombre, 'home', match.equipo_local_id)}
                     </td>
                     <td class="results-score-cell">
                         <span class="results-score">${gl} – ${gv}</span>
                     </td>
                     <td class="results-team-cell results-team-cell-away">
-                        ${teamCell(match.equipo_visitante_nombre, 'away')}
+                        ${teamCell(match.equipo_visitante_nombre, 'away', match.equipo_visitante_id)}
                     </td>
                 </tr>
                 ${renderInlinePanel(match)}
@@ -600,6 +605,8 @@
             if (favRes.error) {
                 console.warn('[Resultados] Error favorite_selections:', favRes.error);
             }
+
+            window.setTeamCrestMap?.(teamsCatalog || []);
 
             cachedMembers = members;
             cachedScoringRules = scoringRules || {};

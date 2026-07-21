@@ -1,5 +1,5 @@
 // js/flags.js
-// Banderas vía CDN de Flagpedia (flagcdn.com) — sin API key
+// Banderas (flagcdn) + escudos de club (crest_url de football-data)
 
 const TEAM_ISO_CODES = {
     'GERMANY': 'de',
@@ -356,12 +356,61 @@ window.getTeamFlagUrl = function(teamName) {
     return `https://flagcdn.com/w40/${iso}.png`;
 };
 
-window.teamFlagHtml = function(teamName) {
+/** Mapa nombre API → crest_url (rellenado al cargar equipos del torneo). */
+window.setTeamCrestMap = function(teamsOrMap) {
+    const byName = {};
+    const byId = {};
+    if (Array.isArray(teamsOrMap)) {
+        teamsOrMap.forEach((t) => {
+            const url = t?.crest_url;
+            if (!url) return;
+            if (t.nombre) byName[String(t.nombre)] = url;
+            if (t.id != null) byId[String(t.id)] = url;
+        });
+    } else if (teamsOrMap && typeof teamsOrMap === 'object') {
+        Object.assign(byName, teamsOrMap);
+    }
+    window.__teamCrestByName = byName;
+    window.__teamCrestById = byId;
+};
+
+window.getTeamCrestUrl = function(teamName, opts) {
+    if (opts?.crestUrl) return opts.crestUrl;
+    if (opts?.teamId != null && window.__teamCrestById?.[String(opts.teamId)]) {
+        return window.__teamCrestById[String(opts.teamId)];
+    }
+    if (!teamName || teamName === 'Por definir') return null;
+    const map = window.__teamCrestByName || {};
+    if (map[teamName]) return map[teamName];
+    const trimmed = String(teamName).trim();
+    if (map[trimmed]) return map[trimmed];
+    return null;
+};
+
+/**
+ * Badge híbrido: escudo (club) si hay crest_url; si no, bandera flagcdn (selecciones).
+ * @param {string} teamName nombre API del equipo
+ * @param {{ crestUrl?: string, teamId?: string|number }} [opts]
+ */
+window.teamBadgeHtml = function(teamName, opts) {
+    const crest = window.getTeamCrestUrl?.(teamName, opts);
+    if (crest) {
+        const alt = teamName ? `Escudo de ${teamName}` : 'Escudo';
+        const safeAlt = alt.replace(/"/g, '&quot;');
+        const safeSrc = String(crest).replace(/"/g, '&quot;');
+        return `<img class="team-flag team-crest" src="${safeSrc}" alt="${safeAlt}" width="24" height="24" loading="lazy" decoding="async">`;
+    }
+
     const url = window.getTeamFlagUrl(teamName);
     if (!url) {
-        return `<span class="team-flag team-flag-missing" title="Sin bandera: ${String(teamName || '').replace(/"/g, '')}" aria-hidden="true"></span>`;
+        return `<span class="team-flag team-flag-missing" title="Sin escudo/bandera: ${String(teamName || '').replace(/"/g, '')}" aria-hidden="true"></span>`;
     }
     const alt = teamName ? `Bandera de ${teamName}` : '';
     const safeAlt = alt.replace(/"/g, '&quot;');
     return `<img class="team-flag" src="${url}" alt="${safeAlt}" width="24" height="18" loading="lazy" decoding="async">`;
+};
+
+/** Alias: mismo badge híbrido (escudo o bandera). */
+window.teamFlagHtml = function(teamName, opts) {
+    return window.teamBadgeHtml(teamName, opts);
 };

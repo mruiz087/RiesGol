@@ -101,7 +101,7 @@ function setAuthScreen(screen) {
     if (subtitle) {
         if (screen === 'forgot') subtitle.textContent = 'Recuperar contraseña';
         else if (screen === 'recovery') subtitle.textContent = 'Nueva contraseña';
-        else subtitle.textContent = 'La porra definitiva del Mundial';
+        else subtitle.textContent = 'La porra definitiva';
     }
 
     if (showAuth) {

@@ -24,11 +24,13 @@ const FOOTBALL_DATA_KEY = Deno.env.get("API_SPORTS_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-// v1: solo selecciones nacionales. Excluimos Champions (CL), Europa League y
-// Conference League: el modelo Pichichi (bombos + selecciones) no encaja con clubes.
+// Competiciones soportadas: selecciones (WC, EC) y clubes UEFA (CL, EL, UCL).
 const ALLOWED = [
   { code: "WC", tipo: "WORLD_CUP" },
   { code: "EC", tipo: "EURO" },
+  { code: "CL", tipo: "CHAMPIONS" },
+  { code: "EL", tipo: "EUROPA" },
+  { code: "UCL", tipo: "CONFERENCE" },
 ];
 
 function deriveEstado(startDate: string | null, endDate: string | null): string {

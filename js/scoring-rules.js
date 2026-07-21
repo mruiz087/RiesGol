@@ -28,7 +28,7 @@
             category: 'favorite',
             label: 'Pólvora Mojada',
             pending: false,
-            description: 'Si el favorito no marca, restas goles recibidos × coeficiente FIFA × fase.',
+            description: 'Si el favorito no marca, restas goles recibidos × coeficiente × fase.',
             params: [],
             icon: 'wet',
         },

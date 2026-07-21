@@ -7,7 +7,8 @@ CREATE SCHEMA IF NOT EXISTS porra;
 CREATE TABLE porra.teams (
     id SERIAL PRIMARY KEY,
     nombre TEXT NOT NULL,
-    tournament_id BIGINT REFERENCES porra.tournaments(id) ON DELETE CASCADE
+    tournament_id BIGINT REFERENCES porra.tournaments(id) ON DELETE CASCADE,
+    crest_url TEXT
 );
 
 CREATE UNIQUE INDEX ux_teams_tournament_nombre ON porra.teams(tournament_id, nombre);
